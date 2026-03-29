@@ -5,6 +5,10 @@ import { notFound } from 'next/navigation';
 import { useState } from 'react';
 import { MapPin, ChevronLeft, Shield, CheckCircle, X, ChevronRight } from 'lucide-react';
 
+export function generateStaticParams() {
+  return PROPERTIES.map((p) => ({ slug: p.slug }));
+}
+
 export default function ImovelDetails({ params }: { params: { slug: string } }) {
   const prop = PROPERTIES.find((p) => p.slug === params.slug);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
