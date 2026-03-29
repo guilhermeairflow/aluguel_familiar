@@ -1,0 +1,49 @@
+/* Remove @import bloqueante — fonte carregada no layout.tsx de forma async */
+
+:root {
+  --primary: #0F172A;
+  --bg-color: #F8FAFC;
+  --accent: #1D4ED8;
+  --accent-hover: #1E40AF;
+  --text-dark: #1E293B;
+  --text-muted: #64748B;
+  --card-bg: #FFFFFF;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  /* Evitar reflow ao carregar fonte */
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  /* System font stack como fallback instantâneo — sem FOUT */
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-dark);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  /* Evitar layout shift em imagens */
+  max-width: 100%;
+  height: auto;
+}
+
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}

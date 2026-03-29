@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Supabase
+  url      = env("DATABASE_URL")
+}
+
+// ------ ADMIN & CONFIG ------ //
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(ADMIN)
+  createdAt     DateTime @default(now())
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique // ex: "WHATSAPP_NUMBER", "PLATFORM_FEE"
+  value String
+}
+
+// ------ IMÓVEIS (CORE) ------ //
+
+model Property {
+  id                  String   @id @default(uuid())
+  slug                String   @unique // URL amigável ex: "casa-perola-montanha"
+  title               String
+  subtitle            String?
+  shortDescription    String
+  fullDescription     String   @db.Text
+  status              PropertyStatus @default(DRAFT)
+  
+  // Endereço e Localização
+  address             String
+  city                String
+  state               String
+  country             String   @default("Brasil")
+  neighborhood        String?
+  latitude            Float?
+  longitude           Float?
+  locationHighlight   String?  // Ponto de referência visual
+
+  // Capacidade e Estrutura
+  maxGuests           Int
+  maxAdults           Int
+  maxChildren         Int?
+  maxPets             Int?
+  rooms               Int
+  beds                Int
+  bathrooms           Float    // 1.5 para lavabos
+  garages             Int      @default(0)
+
+  // Check-in / Checkout Defaults
+  checkInTime         String   @default("14:00") // Formato amigável
+  checkOutTime        String   @default("11:00")
+  
+  // Taxas Base (Fallback se não houver dinâmico)
+  basePricePerNight   Decimal  @db.Decimal(10, 2)
+  cleaningFee         Decimal  @db.Decimal(10, 2)
+  petFeePerUnit       Decimal  @db.Decimal(10, 2) @default(0.00)
+  extraGuestFee       Decimal  @db.Decimal(10, 2) @default(0.00)
+
+  cancellationPolicy  String   @db.Text
+  additionalRules     String?  @db.Text
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relacionamentos
+  photos              PropertyImage[]
+  amenities           PropertyAmenity[]
+  pricingRules        PricingRule[]
+  availabilities      Availability[]
+  inquiries           Inquiry[]
+  reviews             Review[]
+}
+
+enum PropertyStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+// ------ FOTOS & COMODIDADES ------ //
+
+model PropertyImage {
+  id         String   @id @default(uuid())
+  propertyId String
+  url        String
+  isCover    Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model Amenity {
+  id         String   @id @default(uuid())
+  name       String   // ex: "Piscina Aquecida", "Wi-Fi Veloz", "Redário"
+  iconRef    String?  // Nome do icone SVG
+  properties PropertyAmenity[]
+}
+
+model PropertyAmenity {
+  propertyId String
+  amenityId  String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenity    Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, amenityId])
+}
+
+// ------ CALENDÁRIO & MOTOR DE PREÇOS ------ //
+
+// Tabela de BLOQUEIOS físicos (Impossível simular)
+model Availability {
+  id         String   @id @default(uuid())
+  propertyId String
+  startDate  DateTime @db.Date // Ignora timezone local, salva apenas a data
+  endDate    DateTime @db.Date
+  reason     BlockReason @default(MANUAL_BLOCK)
+  notes      String?
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, startDate, endDate])
+}
+
+enum BlockReason {
+  MANUAL_BLOCK
+  MAINTENANCE
+  OWNER_USE
+  EXTERNAL_BOOKING
+}
+
+// Tabela de PREÇOS DINÂMICOS (Sobrescrevem a base)
+model PricingRule {
+  id            String   @id @default(uuid())
+  propertyId    String
+  startDate     DateTime @db.Date
+  endDate       DateTime @db.Date
+  pricePerNight Decimal  @db.Decimal(10, 2)
+  minNights     Int      @default(1)
+  ruleType      PriceRuleType @default(SEASON)
+  title         String?  // Ex: "Réveillon 2027" ou "Fim de Semana"
+  
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  
+  @@index([propertyId])
+}
+
+enum PriceRuleType {
+  WEEKEND
+  HOLIDAY
+  SEASON
+  PROMO
+}
+
+// ------ CONVERSÃO & LEADS (WhatsApp) ------ //
+
+model Inquiry {
+  id               String   @id @default(uuid())
+  propertyId       String
+  checkIn          DateTime @db.Date
+  checkOut         DateTime @db.Date
+  
+  adultsCount      Int
+  childrenCount    Int      @default(0)
+  petsCount        Int      @default(0)
+  
+  quotedPriceTotal Decimal  @db.Decimal(10, 2) // Preço estático na hora da consulta
+  status           InquiryStatus @default(PENDING)
+  createdAt        DateTime @default(now())
+
+  property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  childrenAges     InquiryChildAge[] // Mapeia as idades exatas
+}
+
+model InquiryChildAge {
+  id        String   @id @default(uuid())
+  inquiryId String
+  age       Int
+  inquiry   Inquiry  @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+}
+
+enum InquiryStatus {
+  PENDING
+  ATTENDED
+  CONVERTED
+  LOST
+}
+
+// ------ SOCIAL PROOF ------ //
+
+model Review {
+  id         String   @id @default(uuid())
+  propertyId String
+  guestName  String
+  rating     Int      // 1 a 5
+  comment    String   @db.Text
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}

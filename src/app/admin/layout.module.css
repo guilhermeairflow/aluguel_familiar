@@ -1,0 +1,46 @@
+.adminLayout { display: flex; height: 100vh; background: #F8FAFC; overflow: hidden; }
+.sidebar { width: 260px; background: white; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; padding: 24px 20px; flex-shrink: 0; transition: transform 0.3s ease; z-index: 100; }
+.sidebarLogoText { font-size: 1.25rem; font-weight: 800; color: #0F172A; }
+.sidebarLogoSub { font-size: 0.75rem; color: #64748B; margin-bottom: 30px; }
+.sidebarNav { flex: 1; overflow-y: auto; }
+.navSection { margin-bottom: 8px; }
+.navSectionTitle { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #94A3B8; margin-bottom: 8px; letter-spacing: 0.08em; padding: 0 12px; }
+.navIcon { font-size: 1.1rem; }
+.navItem { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: #475569; font-weight: 600; font-size: 0.88rem; transition: background 0.2s; text-decoration: none; }
+.navItem:hover { background: #F1F5F9; color: #0F172A; }
+.navItem.active { background: #EFF6FF; color: #1D4ED8; }
+.sidebarFooter { margin-top: 16px; border-top: 1px solid #E2E8F0; padding-top: 16px; }
+.logoutBtn { width: 100%; border: none; background: #FEF2F2; color: #DC2626; font-weight: 600; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+.logoutBtn:hover { background: #FEE2E2; }
+.mainContent { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.topbar { background: white; border-bottom: 1px solid #E2E8F0; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.topbarTitle { font-size: 1.15rem; font-weight: 700; color: #0F172A; }
+.topbarSub { font-size: 0.8rem; color: #64748B; }
+.adminBadge { background: #F1F5F9; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+.pageContent { flex: 1; padding: 24px 32px; overflow-y: auto; }
+.menuBtn { display: none; background: none; border: none; cursor: pointer; padding: 4px; color: #475569; }
+.overlay { display: none; }
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 20px rgba(0,0,0,0.15);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 99;
+  }
+  .mainContent { width: 100%; }
+  .menuBtn { display: flex; align-items: center; justify-content: center; }
+  .pageContent { padding: 16px; }
+  .topbar { padding: 12px 16px; }
+  .adminBadge { display: none; }
+}
