@@ -466,11 +466,16 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
 
 // ── WIDGET DE RESERVA ─────────────────────────────────────────────────────────
 function ReservationWidget({ prop }: { prop: any }) {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  
   const [adults, setAdults] = useState(2);
   const [minors, setMinors] = useState(0);
   const [minorAges, setMinorAges] = useState<string[]>([]);
   const [checkin, setCheckin] = useState('');
   const [checkout, setCheckout] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const nights = checkin && checkout
     ? Math.max(0, Math.round((new Date(checkout).getTime() - new Date(checkin).getTime()) / 86400000))
@@ -489,13 +494,57 @@ function ReservationWidget({ prop }: { prop: any }) {
     const dates = checkin && checkout ? `%0A📅 *Período:* ${fmt(checkin)} a ${fmt(checkout)} (${nights} noite${nights !== 1 ? 's' : ''})` : '';
     const agesStr = minorAges.filter(Boolean).length ? ` (Idades: ${minorAges.join(', ')})` : '';
     const guestsStr = `%0A👥 *Hóspedes:* ${adults} adulto(s)${minors > 0 ? `, ${minors} criança(s)${agesStr}` : ''}`;
-    return `https://wa.me/5511945747572?text=Olá! Tenho interesse no imóvel *${encodeURIComponent(prop.title)}* em *${prop.city}*.${dates}${guestsStr}%0A%0APoderia me informar disponibilidade e valor?`;
+    return `https://wa.me/5511945747572?text=Olá! Me chamo ${firstName}. Tenho interesse no imóvel *${encodeURIComponent(prop.title)}* em *${prop.city}*.${dates}${guestsStr}%0A%0APoderia me informar disponibilidade e valor?`;
+  };
+
+  const handleBooking = async () => {
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      alert('Por favor, preencha seu nome, sobrenome e e-mail antes de consultar.');
+      return;
+    }
+    if (minors > 0 && minorAges.some(a => !a)) {
+      alert('Por favor, informe a idade de todas as crianças.');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      // 1. Send silent notification mail
+      await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          propertyTitle: prop.title,
+          checkin, checkout, adults, minors, minorAges
+        })
+      });
+      // 2. Open WA
+      window.open(waLink(), '_blank');
+    } catch(e) {
+      console.error(e);
+      window.open(waLink(), '_blank'); // fallback to WA anyway
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const counterBtn: React.CSSProperties = { width: 32, height: 32, borderRadius: '50%', border: '1px solid #bbb', background: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '1rem', color: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 
   return (
     <div>
+      {/* Dados do Cliente */}
+      <div style={{ marginBottom: 16 }}>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111', marginBottom: 12 }}>Seus Dados</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <input type="text" placeholder="Nome" value={firstName} onChange={e=>setFirstName(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
+          <input type="text" placeholder="Sobrenome" value={lastName} onChange={e=>setLastName(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
+        </div>
+        <input type="email" placeholder="Seu melhor e-mail" value={email} onChange={e=>setEmail(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
+      </div>
+
       {/* Datas */}
       <div style={{ border: '1px solid #ccc', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
@@ -563,14 +612,13 @@ function ReservationWidget({ prop }: { prop: any }) {
       )}
 
       {/* CTA WhatsApp */}
-      <a
-        href={waLink()}
-        target="_blank"
-        rel="noreferrer"
-        style={{ display: 'block', width: '100%', background: 'linear-gradient(135deg,#25D366,#128C7E)', color: 'white', textAlign: 'center', padding: '16px', borderRadius: 12, fontWeight: 700, textDecoration: 'none', fontSize: '1rem', boxShadow: '0 6px 16px rgba(37,211,102,0.35)', boxSizing: 'border-box' }}
+      <button
+        onClick={handleBooking}
+        disabled={isSubmitting}
+        style={{ display: 'block', width: '100%', background: 'linear-gradient(135deg,#25D366,#128C7E)', color: 'white', textAlign: 'center', padding: '16px', borderRadius: 12, fontWeight: 700, textDecoration: 'none', fontSize: '1rem', border: 'none', cursor: 'pointer', boxShadow: '0 6px 16px rgba(37,211,102,0.35)', boxSizing: 'border-box', opacity: isSubmitting ? 0.7 : 1 }}
       >
-        📱 Confirmar pelo WhatsApp
-      </a>
+        📱 {isSubmitting ? 'Processando envio...' : 'Confirmar pelo WhatsApp'}
+      </button>
       <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#aaa', marginTop: 10 }}>
         Você não será cobrado ainda. Nossa equipe confirma a disponibilidade.
       </p>
