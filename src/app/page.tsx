@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, MouseEvent, UIEvent } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from './page.module.css';
 import { PROPERTIES } from '@/lib/properties-data';
@@ -74,22 +74,38 @@ function PropertyCard({ prop }: { prop: typeof PROPERTIES[0] }) {
   const images = prop.images.slice(0, 5);
   const total = images.length;
 
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
   const prev = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIdx(i => (i - 1 + total) % total);
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: -scrollRef.current.offsetWidth, behavior: 'smooth' });
+    }
   };
 
   const next = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIdx(i => (i + 1) % total);
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: +scrollRef.current.offsetWidth, behavior: 'smooth' });
+    }
   };
 
   const goTo = (e: React.MouseEvent, n: number) => {
     e.preventDefault();
     e.stopPropagation();
-    setIdx(n);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ left: n * scrollRef.current.offsetWidth, behavior: 'smooth' });
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const index = Math.round(el.scrollLeft / el.offsetWidth);
+    if (index !== idx && index >= 0 && index < total) {
+      setIdx(index);
+    }
   };
 
   return (
@@ -98,43 +114,43 @@ function PropertyCard({ prop }: { prop: typeof PROPERTIES[0] }) {
       className={styles.card}
       style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
     >
-      <div className={styles.cardImgWrap} style={{ position: 'relative', overflow: 'hidden' }}>
-        {images.map((src, i) => (
-          <img
-            key={i}
-            src={src}
-            alt={i === 0 ? prop.title : ''}
-            loading={i === 0 ? 'eager' : 'lazy'}
-            decoding="async"
-            style={{
-              position: i === 0 ? 'relative' : 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              opacity: idx === i ? 1 : 0,
-              transition: 'opacity 0.4s ease',
-              display: 'block',
-            }}
-          />
-        ))}
+      <div className={styles.cardImgWrap} style={{ position: 'relative' }}>
+        <style dangerouslySetInnerHTML={{ __html: `.hide-scroll::-webkit-scrollbar { display: none; }` }} />
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="hide-scroll"
+          style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', width: '100%', height: '100%', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {images.map((src, i) => (
+            <div key={i} style={{ flex: '0 0 100%', scrollSnapAlign: 'start', position: 'relative', height: '100%' }}>
+              <img
+                src={src}
+                alt={i === 0 ? prop.title : ''}
+                loading={i === 0 ? 'eager' : 'lazy'}
+                decoding="async"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            </div>
+          ))}
+        </div>
 
         {total > 1 && (
-          <button onClick={prev} aria-label="Foto anterior" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.92)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: '#0F172A', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', zIndex: 5 }} className={styles.carouselBtn}>‹</button>
+          <button onClick={prev} aria-label="Foto anterior" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.92)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: '#0F172A', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', zIndex: 10 }} className={styles.carouselBtn}>‹</button>
         )}
         {total > 1 && (
-          <button onClick={next} aria-label="Próxima foto" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.92)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: '#0F172A', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', zIndex: 5 }} className={styles.carouselBtn}>›</button>
+          <button onClick={next} aria-label="Próxima foto" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.92)', border: 'none', borderRadius: '50%', width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: '#0F172A', boxShadow: '0 2px 8px rgba(0,0,0,0.18)', zIndex: 10 }} className={styles.carouselBtn}>›</button>
         )}
 
         {total > 1 && (
-          <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 5, zIndex: 5 }}>
+          <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 5, zIndex: 10 }}>
             {images.map((_, i) => (
-              <button key={i} onClick={(e) => goTo(e, i)} aria-label={`Foto ${i + 1}`} style={{ width: idx === i ? 16 : 6, height: 6, borderRadius: 3, background: idx === i ? 'white' : 'rgba(255,255,255,0.55)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.25s ease', zIndex: 5 }} />
+              <button key={i} onClick={(e) => goTo(e, i)} aria-label={`Foto ${i + 1}`} style={{ width: idx === i ? 16 : 6, height: 6, borderRadius: 3, background: idx === i ? 'white' : 'rgba(255,255,255,0.55)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.25s ease' }} />
             ))}
           </div>
         )}
 
-        <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: 20, zIndex: 5, backdropFilter: 'blur(4px)' }}>
+        <div style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: '0.72rem', fontWeight: 700, padding: '3px 8px', borderRadius: 20, zIndex: 10, backdropFilter: 'blur(4px)' }}>
           {idx + 1}/{total}
         </div>
       </div>
