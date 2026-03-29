@@ -80,9 +80,9 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
         <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none', color: '#222', fontWeight: 600, fontSize: '0.9rem' }}>
           <ChevronLeft size={20} /> Voltar
         </a>
-        <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+        <a href="/" style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', textDecoration: 'none' }}>
           Aluguel<span style={{ color: '#2563eb' }}>Familiar</span>
-        </span>
+        </a>
       </nav>
 
       <div className="page-container">

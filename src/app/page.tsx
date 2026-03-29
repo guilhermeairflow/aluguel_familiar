@@ -195,7 +195,7 @@ export default function Home() {
     <main>
       <header className={styles.header}>
         <div className={`container ${styles.headerNav}`}>
-          <div className={styles.logo}>AluguelFamiliar.</div>
+          <a href="/" className={styles.logo} style={{ textDecoration: 'none', color: 'inherit' }}>AluguelFamiliar.</a>
           <nav>
             <a href="/admin" style={{ fontSize: '0.9rem', fontWeight: 600, color: 'white', opacity: 0.9 }}>Admin</a>
           </nav>
