@@ -181,14 +181,19 @@ function PropertyCard({ prop }: { prop: typeof PROPERTIES[0] }) {
 }
 
 export default function Home() {
-  const [searchCity, setSearchCity] = useState('');
+  const [searchType, setSearchType] = useState('');
   const [searchGuests, setSearchGuests] = useState('');
 
   const filtered = PROPERTIES.filter(p => {
-    const cityMatch = searchCity === '' || p.city.toLowerCase().includes(searchCity.toLowerCase()) || p.title.toLowerCase().includes(searchCity.toLowerCase());
+    let typeMatch = true;
+    const c = p.city.toLowerCase();
+    const isCampo = c.includes('itu') || c.includes('campos');
+    if (searchType === 'campo') typeMatch = isCampo;
+    if (searchType === 'praia') typeMatch = !isCampo;
+
     const guestsNum = parseInt(searchGuests);
     const guestsMatch = !searchGuests || isNaN(guestsNum) || p.maxGuests >= guestsNum;
-    return cityMatch && guestsMatch;
+    return typeMatch && guestsMatch;
   });
 
   return (
@@ -210,13 +215,16 @@ export default function Home() {
             <div className={styles.searchGlass}>
               <div className={styles.searchBlock}>
                 <span className={styles.searchLabel}>Onde</span>
-                <input
-                  type="text"
-                  placeholder="Guarujá, Ilhabela, Campos..."
+                <select
                   className={styles.searchVal}
-                  value={searchCity}
-                  onChange={e => setSearchCity(e.target.value)}
-                />
+                  value={searchType}
+                  onChange={e => setSearchType(e.target.value)}
+                  style={{ cursor: 'pointer', border: 'none', outline: 'none', width: '100%', fontSize: '0.95rem', color: '#111', background: 'transparent' }}
+                >
+                  <option value="">Para onde?</option>
+                  <option value="praia">🏖️ Praia (Litoral)</option>
+                  <option value="campo">🌲 Campo (Interior)</option>
+                </select>
               </div>
               <div className={styles.searchDivider}></div>
               <div className={styles.searchBlock}>
@@ -245,14 +253,14 @@ export default function Home() {
       <section id="results" className={`container ${styles.propertiesSection}`}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', flexWrap: 'wrap', gap: 12 }}>
           <h2 className={styles.sectionTitle} style={{ margin: 0 }}>
-            {searchCity || searchGuests ? `${filtered.length} imóvel(is) encontrado(s)` : 'Descobertas Incríveis'}
+            {searchType || searchGuests ? `${filtered.length} imóvel(is) encontrado(s)` : 'Descobertas Incríveis'}
           </h2>
-          {(searchCity || searchGuests) && (
+          {(searchType || searchGuests) && (
             <button
-              onClick={() => { setSearchCity(''); setSearchGuests(''); }}
-              style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '8px 16px', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem' }}
+              onClick={() => { setSearchType(''); setSearchGuests(''); }}
+              style={{ background: 'transparent', border: '1px solid currentColor', borderRadius: 20, padding: '6px 14px', fontSize: '0.85rem', fontWeight: 600, color: '#3b82f6', cursor: 'pointer' }}
             >
-              ✕ Limpar filtros
+              Limpar filtros
             </button>
           )}
         </div>
@@ -263,7 +271,7 @@ export default function Home() {
             <p style={{ fontSize: '1.2rem', fontWeight: 600 }}>Nenhum imóvel encontrado</p>
             <p style={{ fontSize: '0.95rem', marginTop: 8 }}>
               Tente outro destino ou{' '}
-              <button onClick={() => { setSearchCity(''); setSearchGuests(''); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem' }}>
+              <button onClick={() => { setSearchType(''); setSearchGuests(''); }} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem' }}>
                 ver todos os imóveis
               </button>.
             </p>
