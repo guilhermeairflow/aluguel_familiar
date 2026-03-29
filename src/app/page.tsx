@@ -57,13 +57,6 @@ function HeroCarousel() {
           />
         ))}
       </div>
-      {/* Arrows */}
-      <button onClick={() => setCurrent(i => (i - 1 + HERO_IMAGES.length) % HERO_IMAGES.length)} aria-label="Foto anterior" style={{ position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '50%', width: 40, height: 40, color: 'white', cursor: 'pointer', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <ChevronLeft size={20} />
-      </button>
-      <button onClick={() => setCurrent(i => (i + 1) % HERO_IMAGES.length)} aria-label="Próxima foto" style={{ position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)', zIndex: 5, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '50%', width: 40, height: 40, color: 'white', cursor: 'pointer', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <ChevronRight size={20} />
-      </button>
     </>
   );
 }
