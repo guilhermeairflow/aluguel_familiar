@@ -158,7 +158,7 @@ function PropertyCard({ prop }: { prop: typeof PROPERTIES[0] }) {
           <span>·</span>
           <span>🛌 {prop.bedrooms} quartos</span>
           <span>·</span>
-          <span>🚿 {prop.bathrooms} banhos</span>
+          <span>🚿 {prop.bathrooms} banheiros</span>
         </div>
         <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
           {prop.features.slice(0, 2).map((feature: string, i: number) => (
