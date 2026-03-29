@@ -20,7 +20,7 @@
 .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; }
 
 /* Properties section */
-.propertiesSection { padding: 64px 0 80px; }
+.propertiesSection { padding-top: 64px; padding-bottom: 80px; }
 .sectionTitle { font-size: 1.75rem; font-weight: 700; color: #0f172a; }
 
 /* Cards grid */
@@ -68,7 +68,7 @@
   }
 
   /* Section */
-  .propertiesSection { padding: 32px 0 60px; }
+  .propertiesSection { padding-top: 32px; padding-bottom: 60px; }
   .sectionTitle { font-size: 1.4rem; }
 
   /* Grid — single column on mobile */
