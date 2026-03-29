@@ -338,6 +338,7 @@ A apenas 100 metros da praia. Região nobre e bem estruturada.
     title: 'Mansão Pé na Areia Guarujá 18 Pessoas + Piscina',
     city: 'Guarujá',
     state: 'SP',
+    mapLocation: 'Praia da Enseada, Guarujá, SP, Brasil',
     basePricePerNight: 5800,
     cleaningFee: 700,
     maxGuests: 18,
