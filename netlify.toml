@@ -1,8 +1,10 @@
 [build]
-  command = "echo 'Static site - no build needed'"
-  publish = "out"
+  command = "npm run build"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
-  NETLIFY_NEXT_PLUGIN_SKIP = "true"
   NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
