@@ -256,6 +256,25 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
               </div>
             </div>
 
+            {/* ── MAPA DE LOCALIZAÇÃO ── */}
+            <div style={{ paddingTop: 32, paddingBottom: 32, borderBottom: '1px solid #e2e8f0' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111', margin: '0 0 16px 0' }}>Onde você vai estar</h2>
+              <div style={{ color: '#555', fontSize: '0.95rem', marginBottom: 20 }}>
+                {prop.city}, {prop.state}, Brasil
+                <div style={{ fontSize: '0.85rem', marginTop: 4 }}>A localização exata é fornecida após a confirmação da reserva.</div>
+              </div>
+              <div style={{ width: '100%', height: 320, borderRadius: 16, overflow: 'hidden', background: '#e2e8f0' }}>
+                <iframe
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent(prop.city + ', ' + prop.state + ', Brasil')}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                ></iframe>
+              </div>
+            </div>
+
             {/* ── AVALIAÇÕES ── */}
             {reviews.length > 0 && (
               <div id="reviews" style={{ paddingTop: 32, paddingBottom: 32 }}>

@@ -381,5 +381,72 @@ Localização exclusiva frente ao mar. Estrutura completa de alto padrão.
 
 👩‍🍳 Caseira inclusa · Cozinheira disponível sob contratação
 🪑 4 cadeiras de praia · ⛵ Possibilidade de aluguel de lancha`
+  },
+  {
+    id: '8',
+    slug: 'casa-barra-do-sahy',
+    title: 'Casa Barra do Sahy 9 Pessoas + 300m da Praia',
+    city: 'Barra do Sahy, São Sebastião',
+    state: 'SP',
+    basePricePerNight: 2000,
+    cleaningFee: 300,
+    maxGuests: 9,
+    bedrooms: 5,
+    beds: 9,
+    bathrooms: 6,
+    coverImage: '/barra_do_sahy (1).jpeg',
+    images: [
+      '/barra_do_sahy (1).jpeg',
+      '/barra_do_sahy (2).jpeg',
+      '/barra_do_sahy (3).jpeg',
+      '/barra_do_sahy (4).jpeg',
+      '/barra_do_sahy (5).jpeg',
+      '/barra_do_sahy (6).jpeg',
+      '/barra_do_sahy (7).jpeg',
+      '/barra_do_sahy (8).jpeg',
+      '/barra_do_sahy (9).jpeg',
+      '/barra_do_sahy (10).jpeg',
+      '/barra_do_sahy (11).jpeg',
+      '/barra_do_sahy (12).jpeg',
+      '/barra_do_sahy (13).jpeg',
+      '/barra_do_sahy (14).jpeg',
+      '/barra_do_sahy (15).jpeg',
+      '/barra_do_sahy (16).jpeg',
+      '/barra_do_sahy (17).jpeg',
+      '/barra_do_sahy (18).jpeg',
+      '/barra_do_sahy (19).jpeg',
+      '/barra_do_sahy (20).jpeg',
+      '/barra_do_sahy (21).jpeg',
+      '/barra_do_sahy (22).jpeg',
+      '/barra_do_sahy (23).jpeg',
+      '/barra_do_sahy (24).jpeg'
+    ],
+    features: ['300m da praia', 'Condomínio Fechado Plena Segurança', 'Piscina e Campo no Condomínio', 'Ar-condicionado e Wi-Fi', 'Área Gourmet', 'Churrasqueira e Forno de Pizza'],
+    description: `CASA – BARRA DO SAHY (CONDOMÍNIO FECHADO)
+
+Aproveite a Barra do Sahy com conforto e exclusividade! Casa em condomínio fechado a apenas 300 metros da praia, acomoda até 9 pessoas com 4 suítes + suíte de apoio, ambientes climatizados, Wi-Fi e área gourmet com churrasqueira e forno de pizza à lenha. Condomínio com piscina e campo. Ideal para famílias que buscam segurança, praticidade e lazer próximo ao mar!
+
+👥 Acomoda até 9 pessoas
+🛌 5 dormitórios (4 suítes + 1 suíte de apoio)
+🚿 6 banheiros
+
+📍 Localização: Barra do Sahy, São Sebastião (aprox. 300m da praia, fácil acesso a restaurantes e comércio).
+
+🏠 Estrutura
+❄️ Ar-condicionado nos quartos
+📲 Wi-Fi
+🪵 Forno de pizza à lenha
+🥩 Churrasqueira
+
+🛡️ Condomínio e diferencias
+- Condomínio fechado com segurança
+- 🏊 Piscina no condomínio
+- ⚽ Campo no condomínio
+- Ideal para grupos familiares
+- Localização privilegiada perto da praia e seguro
+
+⚠️ Regras 
+- Pets não são permitidos nesta propriedade.
+- Endereço e acesso completos serão informados na conclusão da reserva.`
   }
 ];
