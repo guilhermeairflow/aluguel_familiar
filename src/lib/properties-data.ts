@@ -62,7 +62,7 @@ Acomoda 10 pessoas! 🛌 3 quartos · 🚽 2 banheiros
     title: 'Casa em Ilhabela 40 Pessoas Piscina + Praia a Pé',
     city: 'Ilhabela',
     state: 'SP',
-    mapLocation: 'Pousada Manga Rosa, Ilhabela, Brasil',
+    mapLocation: 'R. Francisco Gomes da Silva Prado - Centro, Ilhabela, SP, Brasil',
     basePricePerNight: 4500,
     cleaningFee: 600,
     maxGuests: 40,
