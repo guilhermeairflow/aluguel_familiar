@@ -270,7 +270,7 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
                   frameBorder="0"
                   style={{ border: 0 }}
                   loading="lazy"
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(prop.city + ', ' + prop.state + ', Brasil')}&t=&z=13&ie=UTF8&iwloc=&output=embed`}
+                  src={`https://maps.google.com/maps?q=${encodeURIComponent((prop as any).mapLocation || (prop.city + ', ' + prop.state + ', Brasil'))}&t=&z=14&ie=UTF8&iwloc=&output=embed`}
                 ></iframe>
               </div>
             </div>
