@@ -466,6 +466,7 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
 
 // ── WIDGET DE RESERVA ─────────────────────────────────────────────────────────
 function ReservationWidget({ prop }: { prop: any }) {
+  const [step, setStep] = useState(1); // 1: Dates/Guests, 2: Guest Data
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -494,22 +495,36 @@ function ReservationWidget({ prop }: { prop: any }) {
     const dates = checkin && checkout ? `%0A📅 *Período:* ${fmt(checkin)} a ${fmt(checkout)} (${nights} noite${nights !== 1 ? 's' : ''})` : '';
     const agesStr = minorAges.filter(Boolean).length ? ` (Idades: ${minorAges.join(', ')})` : '';
     const guestsStr = `%0A👥 *Hóspedes:* ${adults} adulto(s)${minors > 0 ? `, ${minors} criança(s)${agesStr}` : ''}`;
-    return `https://wa.me/5511945747572?text=Olá! Me chamo ${firstName}. Tenho interesse no imóvel *${encodeURIComponent(prop.title)}* em *${prop.city}*.${dates}${guestsStr}%0A%0APoderia me informar disponibilidade e valor?`;
+    const clientData = `%0A%0A*Dados do Cliente:*%0A👤 Nome: ${firstName} ${lastName}%0A📧 E-mail: ${email}`;
+    
+    return `https://wa.me/5511945747572?text=Olá! Me chamo ${firstName}. Tenho interesse no imóvel *${encodeURIComponent(prop.title)}* em *${prop.city}*.${dates}${guestsStr}${clientData}%0A%0APoderia me informar disponibilidade e valor?`;
   };
 
-  const handleBooking = async () => {
-    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
-      alert('Por favor, preencha seu nome, sobrenome e e-mail antes de consultar.');
+  const handleNextStep = () => {
+    if (!checkin || !checkout) {
+      alert('Por favor, selecione as datas de Check-in e Check-out.');
       return;
     }
     if (minors > 0 && minorAges.some(a => !a)) {
       alert('Por favor, informe a idade de todas as crianças.');
       return;
     }
+    setStep(2);
+  };
+
+  const handleBooking = async () => {
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      alert('Por favor, preencha todos os seus dados antes de confirmar.');
+      return;
+    }
     
     setIsSubmitting(true);
+    const whatsappUrl = waLink();
+
     try {
-      // 1. Send silent notification mail
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500); 
+
       await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -519,15 +534,17 @@ function ReservationWidget({ prop }: { prop: any }) {
           email: email.trim(),
           propertyTitle: prop.title,
           checkin, checkout, adults, minors, minorAges
-        })
-      });
-      // 2. Open WA
-      window.open(waLink(), '_blank');
+        }),
+        signal: controller.signal
+      }).catch(err => console.warn('Email notification skipped:', err));
+      
+      clearTimeout(timeoutId);
+      window.location.href = whatsappUrl;
     } catch(e) {
-      console.error(e);
-      window.open(waLink(), '_blank'); // fallback to WA anyway
+      console.error('Booking error:', e);
+      window.location.href = whatsappUrl;
     } finally {
-      setIsSubmitting(false);
+      setTimeout(() => setIsSubmitting(false), 5000);
     }
   };
 
@@ -535,92 +552,104 @@ function ReservationWidget({ prop }: { prop: any }) {
 
   return (
     <div>
-      {/* Dados do Cliente */}
-      <div style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111', marginBottom: 12 }}>Seus Dados</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-          <input type="text" placeholder="Nome" value={firstName} onChange={e=>setFirstName(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
-          <input type="text" placeholder="Sobrenome" value={lastName} onChange={e=>setLastName(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
-        </div>
-        <input type="email" placeholder="Seu melhor e-mail" value={email} onChange={e=>setEmail(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
-      </div>
+      {step === 1 ? (
+        <>
+          {/* Datas */}
+          <div style={{ border: '1px solid #ccc', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+              <div style={{ padding: '12px 14px', borderRight: '1px solid #ccc' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#111', textTransform: 'uppercase', marginBottom: 4 }}>Check-in</div>
+                <input type="date" value={checkin} min={new Date().toISOString().split('T')[0]} onChange={e => { setCheckin(e.target.value); if (checkout && e.target.value >= checkout) setCheckout(''); }} style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', color: '#222', background: 'transparent', cursor: 'pointer' }} />
+              </div>
+              <div style={{ padding: '12px 14px' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#111', textTransform: 'uppercase', marginBottom: 4 }}>Check-out</div>
+                <input type="date" value={checkout} min={checkin || new Date().toISOString().split('T')[0]} onChange={e => setCheckout(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', color: '#222', background: 'transparent', cursor: 'pointer' }} />
+              </div>
+            </div>
+          </div>
 
-      {/* Datas */}
-      <div style={{ border: '1px solid #ccc', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-          <div style={{ padding: '12px 14px', borderRight: '1px solid #ccc' }}>
-            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#111', textTransform: 'uppercase', marginBottom: 4 }}>Check-in</div>
-            <input type="date" value={checkin} min={new Date().toISOString().split('T')[0]} onChange={e => { setCheckin(e.target.value); if (checkout && e.target.value >= checkout) setCheckout(''); }} style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', color: '#222', background: 'transparent', cursor: 'pointer' }} />
+          {/* Hóspedes */}
+          <div style={{ border: '1px solid #ccc', borderRadius: 10, padding: '0 16px', marginBottom: 16 }}>
+            {[
+              { label: 'Adultos', sub: '13 anos ou mais', val: adults, set: (v: number) => setAdults(Math.max(1, v)) },
+              { label: 'Crianças', sub: 'Até 12 anos', val: minors, set: (v: number) => handleMinors(v - minors) },
+            ].map((row, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 0', borderBottom: i === 0 ? '1px solid #f1f5f9' : 'none' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111' }}>{row.label}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#666' }}>{row.sub}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button style={counterBtn} onClick={() => row.set(row.val - 1)}>−</button>
+                  <span style={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{row.val}</span>
+                  <button style={counterBtn} onClick={() => row.set(row.val + 1)}>+</button>
+                </div>
+              </div>
+            ))}
+            {minors > 0 && (
+              <div style={{ paddingBottom: 14, paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
+                <p style={{ fontSize: '0.8rem', color: '#555', fontWeight: 600, margin: '0 0 8px 0' }}>Idade de cada criança:</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 6 }}>
+                  {minorAges.map((age, i) => (
+                    <select key={i} value={age} onChange={e => setMinorAges(prev => prev.map((a, idx) => idx === i ? e.target.value : a))} style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid #ccc', fontSize: '0.82rem', color: '#111', background: 'white' }}>
+                      <option value="" disabled>Idade...</option>
+                      <option value="0">Menos de 1</option>
+                      {[...Array(12)].map((_, n) => <option key={n+1} value={`${n+1}`}>{n+1} {n+1 === 1 ? 'ano' : 'anos'}</option>)}
+                    </select>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{ padding: '12px 14px' }}>
-            <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#111', textTransform: 'uppercase', marginBottom: 4 }}>Check-out</div>
-            <input type="date" value={checkout} min={checkin || new Date().toISOString().split('T')[0]} onChange={e => setCheckout(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%', fontSize: '0.9rem', color: '#222', background: 'transparent', cursor: 'pointer' }} />
-          </div>
-        </div>
-      </div>
 
-      {/* Hóspedes */}
-      <div style={{ border: '1px solid #ccc', borderRadius: 10, padding: '0 16px', marginBottom: 16 }}>
-        {[
-          { label: 'Adultos', sub: '13 anos ou mais', val: adults, set: (v: number) => setAdults(Math.max(1, v)) },
-          { label: 'Crianças', sub: 'Até 12 anos', val: minors, set: (v: number) => handleMinors(v - minors) },
-        ].map((row, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 0', borderBottom: i === 0 ? '1px solid #f1f5f9' : 'none' }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111' }}>{row.label}</div>
-              <div style={{ fontSize: '0.78rem', color: '#666' }}>{row.sub}</div>
+          <button
+            onClick={handleNextStep}
+            style={{ display: 'block', width: '100%', background: 'linear-gradient(135deg,#FF385C,#E31C5F)', color: 'white', textAlign: 'center', padding: '16px', borderRadius: 12, fontWeight: 700, fontSize: '1rem', border: 'none', cursor: 'pointer', boxShadow: '0 6px 16px rgba(255,56,92,0.25)', boxSizing: 'border-box' }}
+          >
+            Reservar via WhatsApp
+          </button>
+        </>
+      ) : (
+        <>
+          {/* Passo 2: Dados do Cliente */}
+          <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '16px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+               <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#111', margin: 0 }}>Quase lá! Seus Dados</h3>
+               <button onClick={() => setStep(1)} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>Alterar reserva</button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button style={counterBtn} onClick={() => row.set(row.val - 1)}>−</button>
-              <span style={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{row.val}</span>
-              <button style={counterBtn} onClick={() => row.set(row.val + 1)}>+</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <input type="text" placeholder="Nome" value={firstName} onChange={e=>setFirstName(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
+              <input type="text" placeholder="Sobrenome" value={lastName} onChange={e=>setLastName(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
             </div>
+            <input type="email" placeholder="Seu melhor e-mail" value={email} onChange={e=>setEmail(e.target.value)} style={{ width: '100%', padding: '12px 14px', borderRadius: 8, border: '1px solid #ccc', outline: 'none', fontSize: '0.9rem' }} />
           </div>
-        ))}
-        {minors > 0 && (
-          <div style={{ paddingBottom: 14, paddingTop: 10, borderTop: '1px solid #f1f5f9' }}>
-            <p style={{ fontSize: '0.8rem', color: '#555', fontWeight: 600, margin: '0 0 8px 0' }}>Idade de cada criança:</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 6 }}>
-              {minorAges.map((age, i) => (
-                <select key={i} value={age} onChange={e => setMinorAges(prev => prev.map((a, idx) => idx === i ? e.target.value : a))} style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid #ccc', fontSize: '0.82rem', color: '#111', background: 'white' }}>
-                  <option value="" disabled>Idade...</option>
-                  <option value="0">Menos de 1</option>
-                  {[...Array(12)].map((_, n) => <option key={n+1} value={`${n+1}`}>{n+1} {n+1 === 1 ? 'ano' : 'anos'}</option>)}
-                </select>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+
+          <button
+            onClick={handleBooking}
+            disabled={isSubmitting}
+            style={{ display: 'block', width: '100%', background: 'linear-gradient(135deg,#25D366,#128C7E)', color: 'white', textAlign: 'center', padding: '16px', borderRadius: 12, fontWeight: 700, fontSize: '1rem', border: 'none', cursor: 'pointer', boxShadow: '0 6px 16px rgba(37,211,102,0.35)', boxSizing: 'border-box', opacity: isSubmitting ? 0.7 : 1 }}
+          >
+            {isSubmitting ? 'Confirmando...' : 'Confirmar pelo WhatsApp 📱'}
+          </button>
+        </>
+      )}
 
       {/* Resumo de preço */}
       {nights > 0 && (
-        <div style={{ marginBottom: 16, padding: '14px 0', borderTop: '1px solid #f1f5f9' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#333', marginBottom: 8 }}>
+        <div style={{ marginTop: 16, padding: '14px 0', borderTop: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#666', marginBottom: 6 }}>
             <span>R$ {prop.basePricePerNight.toLocaleString('pt-BR')} × {nights} noite{nights !== 1 ? 's' : ''}</span>
             <span>R$ {(prop.basePricePerNight * nights).toLocaleString('pt-BR')}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#333', marginBottom: 12 }}>
-            <span>Taxa de limpeza</span>
-            <span>R$ {prop.cleaningFee.toLocaleString('pt-BR')}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1rem', color: '#111', borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
-            <span>Total</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.95rem', color: '#111', marginTop: 4 }}>
+            <span>Total estimado</span>
             <span>R$ {total.toLocaleString('pt-BR')}</span>
           </div>
         </div>
       )}
-
-      {/* CTA WhatsApp */}
-      <button
-        onClick={handleBooking}
-        disabled={isSubmitting}
-        style={{ display: 'block', width: '100%', background: 'linear-gradient(135deg,#25D366,#128C7E)', color: 'white', textAlign: 'center', padding: '16px', borderRadius: 12, fontWeight: 700, textDecoration: 'none', fontSize: '1rem', border: 'none', cursor: 'pointer', boxShadow: '0 6px 16px rgba(37,211,102,0.35)', boxSizing: 'border-box', opacity: isSubmitting ? 0.7 : 1 }}
-      >
-        📱 {isSubmitting ? 'Processando envio...' : 'Confirmar pelo WhatsApp'}
-      </button>
-      <p style={{ textAlign: 'center', fontSize: '0.75rem', color: '#aaa', marginTop: 10 }}>
-        Você não será cobrado ainda. Nossa equipe confirma a disponibilidade.
+      
+      <p style={{ textAlign: 'center', fontSize: '0.7rem', color: '#aaa', marginTop: 12, lineHeight: 1.4 }}>
+        Você falará diretamente com nossa equipe no WhatsApp para confirmar a reserva.
       </p>
     </div>
   );

@@ -15,7 +15,7 @@ export async function POST(req: Request) {
       service: 'gmail',
       auth: {
         user: 'saadkmauricio@gmail.com', // Sender Account
-        pass: 'tdvl jodh oozc kivu' // App Password provided by user
+        pass: 'xbty szpq cjsv axt' // New App Password
       }
     });
 
