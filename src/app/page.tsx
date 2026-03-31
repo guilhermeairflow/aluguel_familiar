@@ -62,6 +62,13 @@ export default function Home() {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
 
+  // Get today's date for 'min' attribute
+  const [today, setToday] = useState('');
+  useEffect(() => {
+    const d = new Date();
+    setToday(d.toISOString().split('T')[0]);
+  }, []);
+
   // Auto-scroll logic when search is filled
   useEffect(() => {
     if (start && end && guests > 0) {
@@ -91,8 +98,8 @@ export default function Home() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, background: 'white', padding: '12px 20px', borderRadius: 20, width: '100%', maxWidth: 650 }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>HÓSPEDES</span><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><button onClick={() => setGuests(Math.max(1, guests-1))} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer' }}>-</button><span>{guests}</span><button onClick={() => setGuests(guests+1)} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer' }}>+</button></div></div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>ENTRADA</span><input type="date" value={start} onChange={e => setStart(e.target.value)} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer' }} /></div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>SAÍDA</span><input type="date" value={end} onChange={e => setEnd(e.target.value)} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer' }} /></div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>ENTRADA</span><input type="date" min={today} value={start} onChange={e => { setStart(e.target.value); if(end && e.target.value >= end) setEnd(''); }} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer' }} /></div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>SAÍDA</span><input type="date" min={start || today} value={end} onChange={e => setEnd(e.target.value)} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer' }} /></div>
             </div>
           </div>
         </div>
