@@ -248,13 +248,23 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   
-  // Initial state logic with searchParams
+  // Advanced Init from SearchParams
   const [adults, setAdults] = useState(() => {
-    const s = searchParams.get('guests');
+    const s = searchParams.get('adults');
     return s ? Math.max(1, parseInt(s)) : 2;
   });
-  const [minors, setMinors] = useState(0);
-  const [minorAges, setMinorAges] = useState<string[]>([]);
+  const [minors, setMinors] = useState(() => {
+    const s = searchParams.get('minors');
+    return s ? Math.max(0, parseInt(s)) : 0;
+  });
+  const [minorAges, setMinorAges] = useState<string[]>(() => {
+    const s = searchParams.get('minorAges');
+    if (s) return s.split(',');
+    // Fallback if minors > 0 but no ages provided
+    const n = parseInt(searchParams.get('minors') || '0');
+    return Array(n).fill('');
+  });
+
   const [checkin, setCheckin] = useState(searchParams.get('checkin') || '');
   const [checkout, setCheckout] = useState(searchParams.get('checkout') || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -264,10 +274,13 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
   const pricingOverride = allPricing[prop.id];
   const currentBasePrice = pricingOverride?.basePrice ?? prop.basePricePerNight;
 
-  const handleMinors = (diff: number) => {
-    const n = Math.max(0, minors + diff);
+  const handleMinors = (val: number) => {
+    const n = Math.max(0, val);
     setMinors(n);
-    setMinorAges(prev => diff > 0 ? [...prev, ''] : prev.slice(0, n));
+    setMinorAges(prev => {
+      if (n > prev.length) return [...prev, ...Array(n - prev.length).fill('')];
+      return prev.slice(0, n);
+    });
   };
 
   const updateMinorAge = (idx: number, age: string) => {
@@ -332,11 +345,19 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
           <div style={{ border: '1px solid #ccc', borderRadius: 10, padding: '0 16px', marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
               <div><div style={{ fontWeight: 600 }}>Adultos</div><div style={{ fontSize: '0.78rem' }}>13+ anos</div></div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><button onClick={() => setAdults(Math.max(1, adults-1))} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>-</button><span style={{ width: 20, textAlign: 'center', fontWeight: 600 }}>{adults}</span><button onClick={() => setAdults(adults+1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>+</button></div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <button onClick={() => setAdults(Math.max(1, adults-1))} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>-</button>
+                <input type="number" value={adults} onChange={e => setAdults(Math.max(1, parseInt(e.target.value) || 0))} style={{ width: 30, border: 'none', textAlign: 'center', fontWeight: 600, outline: 'none' }} />
+                <button onClick={() => setAdults(adults+1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>+</button>
+              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 0' }}>
               <div><div style={{ fontWeight: 600 }}>Crianças</div><div style={{ fontSize: '0.78rem' }}>Até 12 anos</div></div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><button onClick={() => handleMinors(-1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>-</button><span style={{ width: 20, textAlign: 'center', fontWeight: 600 }}>{minors}</span><button onClick={() => handleMinors(1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>+</button></div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <button onClick={() => handleMinors(minors-1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>-</button>
+                <input type="number" value={minors} onChange={e => handleMinors(parseInt(e.target.value) || 0)} style={{ width: 30, border: 'none', textAlign: 'center', fontWeight: 600, outline: 'none' }} />
+                <button onClick={() => handleMinors(minors+1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>+</button>
+              </div>
             </div>
             
             {/* Child Ages Section */}

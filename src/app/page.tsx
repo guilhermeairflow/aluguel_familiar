@@ -25,12 +25,13 @@ function HeroCarousel() {
   ));
 }
 
-function PropertyCard({ prop, dates, guests, allPricing }: { prop: typeof PROPERTIES[0], dates: { start: string, end: string } | null, guests: number, allPricing: Record<string, PropertyPricing> | null }) {
+function PropertyCard({ prop, dates, adults, minors, minorAges, allPricing }: { prop: typeof PROPERTIES[0], dates: { start: string, end: string } | null, adults: number, minors: number, minorAges: string[], allPricing: Record<string, PropertyPricing> | null }) {
   const pricing = allPricing ? allPricing[prop.id] : null;
   const currentBase = pricing?.basePrice ?? prop.basePricePerNight;
   const res = dates ? calculateStayTotal(prop.id, dates.start, dates.end, allPricing || undefined) : null;
 
-  const query = dates ? `?checkin=${dates.start}&checkout=${dates.end}&guests=${guests}` : '';
+  const agesParam = minorAges.length > 0 ? `&minorAges=${minorAges.join(',')}` : '';
+  const query = dates ? `?checkin=${dates.start}&checkout=${dates.end}&adults=${adults}&minors=${minors}${agesParam}` : '';
 
   return (
     <a href={`/imoveis/${prop.slug}${query}`} className={styles.card} style={{ display: 'block', textDecoration: 'none' }}>
@@ -61,7 +62,9 @@ function PropertyCard({ prop, dates, guests, allPricing }: { prop: typeof PROPER
 
 export default function Home() {
   const [type, setType] = useState('');
-  const [guests, setGuests] = useState(1);
+  const [adults, setAdults] = useState(2);
+  const [minors, setMinors] = useState(0);
+  const [minorAges, setMinorAges] = useState<string[]>([]);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [allPricing, setAllPricing] = useState<Record<string, PropertyPricing>>({});
@@ -80,18 +83,41 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (start && end && guests > 0) {
+    if (start && end && adults > 0) {
       const results = document.getElementById('results');
       if (results) {
         setTimeout(() => results.scrollIntoView({ behavior: 'smooth' }), 300);
       }
     }
-  }, [start, end, guests]);
+  }, [start, end, adults, minors]);
+
+  const handleMinors = (val: number) => {
+    const n = Math.max(0, val);
+    setMinors(n);
+    setMinorAges(prev => {
+      if (n > prev.length) return [...prev, ...Array(n - prev.length).fill('')];
+      return prev.slice(0, n);
+    });
+  };
+
+  const updateMinorAge = (idx: number, age: string) => {
+    const val = parseInt(age);
+    if (val > 12) {
+      alert("Hóspedes a partir de 13 anos devem ser incluídos como 'Adultos'.");
+      return;
+    }
+    setMinorAges(prev => {
+      const copy = [...prev];
+      copy[idx] = age;
+      return copy;
+    });
+  };
 
   const filtered = PROPERTIES.filter(p => {
     const isCampo = p.city.toLowerCase().includes('itu') || p.city.toLowerCase().includes('campos');
     const typeMatch = type === '' ? true : (type === 'campo' ? isCampo : !isCampo);
-    return typeMatch && p.maxGuests >= guests;
+    const totalGuests = adults + minors;
+    return typeMatch && p.maxGuests >= totalGuests;
   });
 
   return (
@@ -100,22 +126,66 @@ export default function Home() {
       <section className={styles.hero}><HeroCarousel />
         <div className="container" style={{ position: 'relative', zIndex: 1 }}>
           <h1 className={styles.title}>Viva o extraordinário.</h1>
-          <div className={styles.searchContainer}>
+          <div className={styles.searchContainer} style={{ width: '100%', maxWidth: '900px' }}>
             <div className={styles.typeToggle}>
               <button className={`${styles.toggleBtn} ${type === 'campo' ? styles.activeBtn : ''}`} onClick={() => setType('campo')}>Campo</button>
               <button className={`${styles.toggleBtn} ${type === 'praia' ? styles.activeBtn : ''}`} onClick={() => setType('praia')}>Praia</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, background: 'white', padding: '12px 20px', borderRadius: 20, width: '100%', maxWidth: 650 }}>
-              <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>HÓSPEDES</span><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><button onClick={() => setGuests(Math.max(1, guests-1))} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer' }}>-</button><span>{guests}</span><button onClick={() => setGuests(guests+1)} style={{ width: 24, height: 24, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer' }}>+</button></div></div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>ENTRADA</span><input type="date" min={today} value={start} onChange={e => { setStart(e.target.value); if(end && e.target.value >= end) setEnd(''); }} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer' }} /></div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}><span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b' }}>SAÍDA</span><input type="date" min={start || today} value={end} onChange={e => setEnd(e.target.value)} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer' }} /></div>
+            
+            <div style={{ background: 'white', padding: '16px 24px', borderRadius: 24, boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 20 }}>
+                {/* Adults */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', marginBottom: 4 }}>ADULTOS (13+)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button onClick={() => setAdults(Math.max(1, adults-1))} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer', background: 'white' }}>-</button>
+                    <input type="number" value={adults} onChange={e => setAdults(Math.max(1, parseInt(e.target.value) || 0))} style={{ width: 35, border: 'none', textAlign: 'center', fontWeight: 700, fontSize: '0.95rem', outline: 'none' }} />
+                    <button onClick={() => setAdults(adults+1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer', background: 'white' }}>+</button>
+                  </div>
+                </div>
+
+                {/* Minors */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', marginBottom: 4 }}>MENORES (ATÉ 12)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button onClick={() => handleMinors(minors-1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer', background: 'white' }}>-</button>
+                    <input type="number" value={minors} onChange={e => handleMinors(parseInt(e.target.value) || 0)} style={{ width: 35, border: 'none', textAlign: 'center', fontWeight: 700, fontSize: '0.95rem', outline: 'none' }} />
+                    <button onClick={() => handleMinors(minors+1)} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid #ddd', cursor: 'pointer', background: 'white' }}>+</button>
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', marginBottom: 4 }}>ENTRADA</span>
+                  <input type="date" min={today} value={start} onChange={e => { setStart(e.target.value); if(end && e.target.value >= end) setEnd(''); }} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer', fontSize: '0.9rem' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', marginBottom: 4 }}>SAÍDA</span>
+                  <input type="date" min={start || today} value={end} onChange={e => setEnd(e.target.value)} style={{ border: 'none', fontWeight: 700, outline: 'none', cursor: 'pointer', fontSize: '0.9rem' }} />
+                </div>
+              </div>
+
+              {/* Child Ages row */}
+              {minors > 0 && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: 8 }}>IDADE DOS MENORES:</span>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {Array.from({ length: minors }).map((_, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '6px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>{i+1}ª</span>
+                        <input type="number" min="0" max="12" placeholder="Anos" value={minorAges[i] || ''} onChange={e => updateMinorAge(i, e.target.value)} style={{ width: 45, border: 'none', background: 'transparent', fontWeight: 700, outline: 'none', fontSize: '0.85rem' }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
       <section className="container" id="results" style={{ padding: '60px 0' }}>
         <h2 style={{ marginBottom: 30 }}>{start && end ? filtered.length + ' encontrados' : 'Explorar'}</h2>
-        <div className={styles.grid}>{filtered.map(p => <PropertyCard key={p.id} prop={p} dates={start && end ? { start, end } : null} guests={guests} allPricing={allPricing} />)}</div>
+        <div className={styles.grid}>{filtered.map(p => <PropertyCard key={p.id} prop={p} dates={start && end ? { start, end } : null} adults={adults} minors={minors} minorAges={minorAges} allPricing={allPricing} />)}</div>
       </section>
     </main>
   );
