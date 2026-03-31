@@ -265,6 +265,11 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
   };
 
   const updateMinorAge = (idx: number, age: string) => {
+    const val = parseInt(age);
+    if (val > 12) {
+      alert("Hóspedes a partir de 13 anos devem ser incluídos como 'Adultos'.");
+      return;
+    }
     setMinorAges(prev => {
       const copy = [...prev];
       copy[idx] = age;
@@ -334,7 +339,7 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
                 <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase' }}>Idade das crianças:</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {Array.from({ length: minors }).map((_, i) => (
-                    <input key={i} type="number" placeholder={`${i+1}ª`} value={minorAges[i] || ''} onChange={e => updateMinorAge(i, e.target.value)} style={{ width: 50, padding: '8px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', textAlign: 'center', fontSize: '0.85rem' }} />
+                    <input key={i} type="number" placeholder={`${i+1}ª`} min="0" max="12" value={minorAges[i] || ''} onChange={e => updateMinorAge(i, e.target.value)} style={{ width: 50, padding: '8px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', textAlign: 'center', fontSize: '0.85rem' }} />
                   ))}
                 </div>
               </div>
