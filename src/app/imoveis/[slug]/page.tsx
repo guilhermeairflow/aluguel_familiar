@@ -271,7 +271,7 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
     const datesText = `%0A📅 *Período:* ${fmt(checkin)} a ${fmt(checkout)} (${res?.nights} noites)`;
     const guestsText = `%0A👥 *Hóspedes:* ${adults} adultos${minors > 0 ? `, ${minors} crianças` : ''}`;
     const valueText = `%0A💰 *Valor Total:* R$ ${res?.total.toLocaleString('pt-BR')}`;
-    const wa = `https://wa.me/5511945747572?text=Olá! Me chamo ${firstName}. Gostaria de reservar *${encodeURIComponent(prop.title)}*.${datesText}${guestsText}${valueText}`;
+    const wa = `https://wa.me/5511945747572?text=Olá! Me chamo *${firstName} ${lastName}* (${email}).%0A%0AGostaria de reservar *${encodeURIComponent(prop.title)}*.${datesText}${guestsText}${valueText}`;
     
     try {
       await fetch('/api/contact', {
