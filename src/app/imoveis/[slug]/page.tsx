@@ -4,7 +4,7 @@ import { PROPERTIES } from '@/lib/properties-data';
 import { loadReviews, getReviewsBySlug, getAverageRating, type Review } from '@/lib/reviews-data';
 import { calculateStayTotal, type PropertyPricing } from '@/lib/pricing-engine';
 import { notFound, useSearchParams } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { MapPin, ChevronLeft, Shield, CheckCircle, X, ChevronRight, Star } from 'lucide-react';
 
 export default function ImovelDetails({ params }: { params: { slug: string } }) {
@@ -200,7 +200,7 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
                 <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#111' }}>R$ {basePrice.toLocaleString('pt-BR')}</span>
                 <span style={{ color: '#666', fontSize: '0.9rem' }}>/noite</span>
               </div>
-              <ReservationWidget prop={prop} allPricing={allPricing} />
+              <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>Carregando reserva...</div>}><ReservationWidget prop={prop} allPricing={allPricing} /></Suspense>
             </div>
           </div>
         </div>
@@ -216,7 +216,7 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowWidget(false)} />
           <div style={{ position: 'relative', background: 'white', borderRadius: '20px 20px 0 0', padding: '24px 20px 40px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}><span style={{ fontWeight: 700, fontSize: '1.1rem' }}>Solicitar Reserva</span><button onClick={() => setShowWidget(false)} style={{ background: 'none', border: 'none' }}><X size={22} /></button></div>
-            <ReservationWidget prop={prop} allPricing={allPricing} />
+            <Suspense fallback={<div style={{ padding: 20, textAlign: 'center', color: '#64748b' }}>Carregando reserva...</div>}><ReservationWidget prop={prop} allPricing={allPricing} /></Suspense>
           </div>
         </div>
       )}
@@ -405,3 +405,4 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
     </div>
   );
 }
+
