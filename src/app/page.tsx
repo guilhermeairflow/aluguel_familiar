@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './page.module.css';
 import { PROPERTIES } from '@/lib/properties-data';
-import { calculateStayTotal } from '@/lib/pricing-engine';
+import { calculateStayTotal, type PropertyPricing } from '@/lib/pricing-engine';
 
 const HERO_IMAGES = [
   '/WhatsApp Image 2026-03-28 at 17.42.42.jpeg',
@@ -25,15 +25,16 @@ function HeroCarousel() {
   ));
 }
 
-function PropertyCard({ prop, dates }: { prop: typeof PROPERTIES[0], dates: { start: string, end: string } | null }) {
-  const [pricing, setPricing] = useState<any>(null);
-  useEffect(() => { const s = localStorage.getItem('af_dynamic_pricing'); if (s) setPricing(JSON.parse(s)); }, []);
-  const res = dates ? calculateStayTotal(prop.id, dates.start, dates.end, pricing) : null;
+function PropertyCard({ prop, dates, allPricing }: { prop: typeof PROPERTIES[0], dates: { start: string, end: string } | null, allPricing: Record<string, PropertyPricing> | null }) {
+  const pricing = allPricing ? allPricing[prop.id] : null;
+  const currentBase = pricing?.basePrice ?? prop.basePricePerNight;
+  const res = dates ? calculateStayTotal(prop.id, dates.start, dates.end, allPricing || undefined) : null;
+
   return (
     <a href={`/imoveis/${prop.slug}`} className={styles.card} style={{ display: 'block', textDecoration: 'none' }}>
       <div className={styles.cardImgWrap} style={{ position: 'relative' }}>
         <img src={prop.images[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        {pricing && pricing[prop.id]?.rules?.some((r:any) => { const t = new Date().toISOString().split('T')[0]; return t >= r.startDate && t <= r.endDate; }) && (
+        {pricing && pricing.rules?.some((r:any) => { const t = new Date().toISOString().split('T')[0]; return t >= r.startDate && t <= r.endDate; }) && (
           <div style={{ position: 'absolute', top: 12, left: 12, background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 900, padding: '4px 8px', borderRadius: 6 }}>ESPECIAL</div>
         )}
       </div>
@@ -48,7 +49,7 @@ function PropertyCard({ prop, dates }: { prop: typeof PROPERTIES[0], dates: { st
               <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 700 }}>R$ {res.average.toLocaleString('pt-BR')} / noite</div>
             </div>
           ) : (
-            <div style={{ fontWeight: 800 }}>R$ {prop.basePricePerNight.toLocaleString('pt-BR')} <span style={{ fontWeight: 400, color: '#64748b', fontSize: '0.8rem' }}>/ noite</span></div>
+            <div style={{ fontWeight: 800 }}>R$ {currentBase.toLocaleString('pt-BR')} <span style={{ fontWeight: 400, color: '#64748b', fontSize: '0.8rem' }}>/ noite</span></div>
           )}
         </div>
       </div>
@@ -61,15 +62,21 @@ export default function Home() {
   const [guests, setGuests] = useState(1);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [allPricing, setAllPricing] = useState<Record<string, PropertyPricing>>({});
 
-  // Get today's date for 'min' attribute
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('af_dynamic_pricing');
+      if (saved) setAllPricing(JSON.parse(saved));
+    }
+  }, []);
+
   const [today, setToday] = useState('');
   useEffect(() => {
     const d = new Date();
     setToday(d.toISOString().split('T')[0]);
   }, []);
 
-  // Auto-scroll logic when search is filled
   useEffect(() => {
     if (start && end && guests > 0) {
       const results = document.getElementById('results');
@@ -106,7 +113,7 @@ export default function Home() {
       </section>
       <section className="container" id="results" style={{ padding: '60px 0' }}>
         <h2 style={{ marginBottom: 30 }}>{start && end ? filtered.length + ' encontrados' : 'Explorar'}</h2>
-        <div className={styles.grid}>{filtered.map(p => <PropertyCard key={p.id} prop={p} dates={start && end ? { start, end } : null} />)}</div>
+        <div className={styles.grid}>{filtered.map(p => <PropertyCard key={p.id} prop={p} dates={start && end ? { start, end } : null} allPricing={allPricing} />)}</div>
       </section>
     </main>
   );

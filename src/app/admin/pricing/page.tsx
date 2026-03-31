@@ -25,7 +25,15 @@ function loadAllPricing(): Record<string, PropertyPricing> {
   if (typeof window === 'undefined') return DEFAULT_PRICING;
   try {
     const saved = localStorage.getItem('af_dynamic_pricing');
-    if (saved) return { ...DEFAULT_PRICING, ...JSON.parse(saved) };
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Merge com default para garantir que novas props existam
+      const merged = { ...DEFAULT_PRICING };
+      Object.keys(parsed).forEach(id => {
+        merged[id] = { ...merged[id], ...parsed[id] };
+      });
+      return merged;
+    }
   } catch {}
   return DEFAULT_PRICING;
 }
@@ -52,12 +60,34 @@ export default function PricingPage() {
   const [allPricing, setAllPricing] = useState<Record<string, PropertyPricing>>(DEFAULT_PRICING);
   const [selectedId, setSelectedId] = useState(PROPERTIES[0].id);
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Selection
   const [selectionStart, setSelectionStart] = useState<Date | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<Date | null>(null);
   const [inputPrice, setInputPrice] = useState<string>('');
+  
+  // States para os inputs de Base (para não salvar no onChange)
+  const [tempBasePrice, setTempBasePrice] = useState<string>('');
+  const [tempCleaningFee, setTempCleaningFee] = useState<string>('');
+  
   const [savedMsg, setSavedMsg] = useState(false);
+  const [baseSavedMsg, setBaseSavedMsg] = useState(false);
 
-  useEffect(() => { setAllPricing(loadAllPricing()); }, []);
+  useEffect(() => {
+    const loaded = loadAllPricing();
+    setAllPricing(loaded);
+    // Inicializa os inputs temporários com o imóvel atual
+    const current = loaded[selectedId] || DEFAULT_PRICING[selectedId];
+    setTempBasePrice(current.basePrice.toString());
+    setTempCleaningFee(current.cleaningFee.toString());
+  }, []);
+
+  // Atualiza os inputs temporários quando trocar de imóvel
+  useEffect(() => {
+    const current = allPricing[selectedId] || DEFAULT_PRICING[selectedId];
+    setTempBasePrice(current.basePrice.toString());
+    setTempCleaningFee(current.cleaningFee.toString());
+  }, [selectedId, allPricing]);
 
   const pricing = allPricing[selectedId] || DEFAULT_PRICING[selectedId];
   const prop = PROPERTIES.find(p => p.id === selectedId)!;
@@ -96,14 +126,15 @@ export default function PricingPage() {
     return rule ? rule.price : null;
   };
 
+  // Salvar Regra de Data
   const handleApplyPrice = () => {
     if (!selectionStart || !inputPrice) return;
-    const start = dateToISO(selectionStart);
-    const end = dateToISO(selectionEnd || selectionStart);
+    const startValue = dateToISO(selectionStart);
+    const endValue = dateToISO(selectionEnd || selectionStart);
     const price = parseFloat(inputPrice);
 
-    const newRule: PricingRule = { id: Math.random().toString(36).substr(2, 9), startDate: start, endDate: end, price };
-    const filteredRules = pricing.rules.filter(r => !(r.startDate >= start && r.endDate <= end));
+    const newRule: PricingRule = { id: Math.random().toString(36).substr(2, 9), startDate: startValue, endDate: endValue, price };
+    const filteredRules = pricing.rules.filter(r => !(r.startDate >= startValue && r.endDate <= endValue));
     const updatedPricing = { ...pricing, rules: [...filteredRules, newRule] };
     const newAllData = { ...allPricing, [selectedId]: updatedPricing };
     setAllPricing(newAllData);
@@ -111,6 +142,20 @@ export default function PricingPage() {
     
     setSelectionStart(null); setSelectionEnd(null); setInputPrice(''); setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 2000);
+  };
+
+  // Salvar Valores Base
+  const handleSaveBase = () => {
+    const bp = parseFloat(tempBasePrice) || 0;
+    const cf = parseFloat(tempCleaningFee) || 0;
+    const updatedPricing = { ...pricing, basePrice: bp, cleaningFee: cf };
+    const newAllData = { ...allPricing, [selectedId]: updatedPricing };
+    
+    setAllPricing(newAllData);
+    saveAllPricing(newAllData);
+    
+    setBaseSavedMsg(true);
+    setTimeout(() => setBaseSavedMsg(false), 2000);
   };
 
   const handleClearRules = () => {
@@ -122,23 +167,24 @@ export default function PricingPage() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 300px', gap: 20 }}>
-      {/* Sidebar */}
+      {/* Sidebar - Lista de Imóveis */}
       <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {PROPERTIES.map(p => {
           const active = selectedId === p.id; const color = PROP_COLORS[p.id];
+          const curr = allPricing[p.id] || DEFAULT_PRICING[p.id];
           return (
             <button key={p.id} onClick={() => { setSelectedId(p.id); setSelectionStart(null); setSelectionEnd(null); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px', borderRadius: 12, border: `2px solid ${active ? color : 'transparent'}`, background: active ? `${color}10` : '#f8fafc', cursor: 'pointer', textAlign: 'left' }}>
               <img src={p.coverImage} draggable={false} style={{ width: 44, height: 34, objectFit: 'cover', borderRadius: 6 }} />
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: '0.85rem', color: active ? color : '#334155' }}>{p.city}</div>
-                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>R$ {p.basePricePerNight}/noite</div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>R$ {curr.basePrice}/noite</div>
               </div>
             </button>
           );
         })}
       </div>
 
-      {/* Calendário */}
+      {/* Meio - Calendário */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontWeight: 800, fontSize: '1.2rem' }}>{MONTHS[month]} {year}</div>
@@ -171,10 +217,30 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* Editor */}
+      {/* Direita - Editor */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Preços Base Editor */}
         <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '24px' }}>
-          <h3 style={{ margin: '0 0 16px', fontWeight: 800, fontSize: '1rem' }}>Ajustar Preço</h3>
+          <h3 style={{ margin: '0 0 16px', fontWeight: 800, fontSize: '1rem' }}>Preços Base</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 6, textTransform: 'uppercase' }}>Diária Padrão (R$)</label>
+              <input type="number" value={tempBasePrice} onChange={e => setTempBasePrice(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', fontWeight: 700 }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 6, textTransform: 'uppercase' }}>Taxa de Limpeza (R$)</label>
+              <input type="number" value={tempCleaningFee} onChange={e => setTempCleaningFee(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', fontWeight: 700 }} />
+            </div>
+            <button onClick={handleSaveBase} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: '#0f172a', color: 'white', fontWeight: 700, cursor: 'pointer', marginTop: 4 }}>
+              {baseSavedMsg ? '✅ Valores Salvos!' : 'Salvar Preços Base'}
+            </button>
+            <div style={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.4 }}>* Estes valores são usados quando não há feriados configurados.</div>
+          </div>
+        </div>
+
+        {/* Custom Price (Rule) Editor */}
+        <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '24px' }}>
+          <h3 style={{ margin: '0 0 16px', fontWeight: 800, fontSize: '1rem' }}>Ajustar Preço (Feriados)</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ background: '#f8fafc', padding: '12px', borderRadius: 12, border: '1.5px solid #e2e8f0', fontSize: '0.82rem', fontWeight: 700 }}>
               {!selectionStart ? 'Selecione datas' : (!selectionEnd ? `Um dia: ${selectionStart.toLocaleDateString('pt-BR')}` : `${selectionStart.toLocaleDateString('pt-BR')} até ${selectionEnd.toLocaleDateString('pt-BR')}`)}
@@ -186,9 +252,13 @@ export default function PricingPage() {
                 <input type="number" value={inputPrice} onChange={e => setInputPrice(e.target.value)} style={{ flex: 1, border: 'none', padding: '12px', fontSize: '1rem', fontWeight: 800, outline: 'none' }} />
               </div>
             </div>
-            <button disabled={!selectionStart || !inputPrice} onClick={handleApplyPrice} style={{ padding: '14px', borderRadius: 12, border: 'none', background: !selectionStart || !inputPrice ? '#e2e8f0' : '#2563eb', color: 'white', fontWeight: 700, cursor: 'pointer' }}>{savedMsg ? '✅ Aplicado!' : 'Salvar Diária'}</button>
+            <button disabled={!selectionStart || !inputPrice} onClick={handleApplyPrice} style={{ padding: '14px', borderRadius: 12, border: 'none', background: !selectionStart || !inputPrice ? '#e2e8f0' : '#2563eb', color: 'white', fontWeight: 700, cursor: 'pointer' }}>
+              {savedMsg ? '✅ Aplicado!' : 'Salvar Diária Especial'}
+            </button>
           </div>
         </div>
+
+        {/* Reset */}
         <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '24px' }}>
           <button onClick={handleClearRules} style={{ width: '100%', background: '#fef2f2', color: '#dc2626', border: 'none', padding: '10px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Resetar Calendário</button>
         </div>
