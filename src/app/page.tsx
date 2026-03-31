@@ -6,8 +6,8 @@ import styles from './page.module.css';
 import { PROPERTIES } from '@/lib/properties-data';
 
 const HERO_IMAGES = [
-  '/IMG_1088.JPG.jpeg',
-  '/IMG_1092.JPG.jpeg',
+  '/WhatsApp Image 2026-03-28 at 17.42.42.jpeg',
+  '/WhatsApp Image 2026-03-28 at 17.42.53 (1).jpeg',
   '/guaruja (2).jpeg',
   '/rivieira (1).jpeg',
   '/ilhabela (2).jpeg',
