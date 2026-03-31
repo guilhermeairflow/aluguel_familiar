@@ -182,7 +182,7 @@ function PropertyCard({ prop }: { prop: typeof PROPERTIES[0] }) {
 
 export default function Home() {
   const [searchType, setSearchType] = useState('');
-  const [searchGuests, setSearchGuests] = useState('');
+  const [searchGuests, setSearchGuests] = useState(1);
 
   const filtered = PROPERTIES.filter(p => {
     let typeMatch = true;
@@ -191,8 +191,8 @@ export default function Home() {
     if (searchType === 'campo') typeMatch = isCampo;
     if (searchType === 'praia') typeMatch = !isCampo;
 
-    const guestsNum = parseInt(searchGuests);
-    const guestsMatch = !searchGuests || isNaN(guestsNum) || p.maxGuests >= guestsNum;
+    const guestsNum = typeof searchGuests === 'number' ? searchGuests : parseInt(searchGuests);
+    const guestsMatch = p.maxGuests >= guestsNum;
     return typeMatch && guestsMatch;
   });
 
@@ -211,40 +211,46 @@ export default function Home() {
         <HeroCarousel />
         <div className="container" style={{ position: 'relative', zIndex: 1 }}>
           <h1 className={styles.title}>Fuja do óbvio. Viva o extraordinário.</h1>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div className={styles.searchGlass}>
-              <div className={styles.searchBlock}>
-                <span className={styles.searchLabel}>Onde</span>
-                <select
-                  className={styles.searchVal}
-                  value={searchType}
-                  onChange={e => setSearchType(e.target.value)}
-                  style={{ cursor: 'pointer', border: 'none', outline: 'none', width: '100%', fontSize: '0.95rem', color: '#111', background: 'transparent' }}
-                >
-                  <option value="">Para onde?</option>
-                  <option value="praia">🏖️ Praia (Litoral)</option>
-                  <option value="campo">🌲 Campo (Interior)</option>
-                </select>
-              </div>
-              <div className={styles.searchDivider}></div>
-              <div className={styles.searchBlock}>
-                <span className={styles.searchLabel}>Hóspedes</span>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Quantas pessoas?"
-                  className={styles.searchVal}
-                  value={searchGuests}
-                  onChange={e => setSearchGuests(e.target.value)}
-                />
-              </div>
-              <button
-                className={styles.searchBtn}
-                onClick={() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' })}
-                aria-label="Buscar"
+                    <div className={styles.searchContainer}>
+            <div className={styles.typeToggle}>
+              <button 
+                className={`${styles.toggleBtn} ${searchType === 'campo' ? styles.activeBtn : ''}`}
+                onClick={() => {
+                  setSearchType('campo');
+                  document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
+                }}
               >
-                <Search size={20} />
+                Campo
               </button>
+              <button 
+                className={`${styles.toggleBtn} ${searchType === 'praia' ? styles.activeBtn : ''}`}
+                onClick={() => {
+                  setSearchType('praia');
+                  document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                Praia
+              </button>
+            </div>
+
+            <div className={styles.guestControl}>
+              <span className={styles.controlLabel}>Hóspedes</span>
+              <div className={styles.counterRow}>
+                <button 
+                  className={styles.countBtn} 
+                  onClick={() => setSearchGuests(Math.max(1, searchGuests - 1))}
+                  disabled={searchGuests <= 1}
+                >
+                  -
+                </button>
+                <span className={styles.countVal}>{searchGuests}</span>
+                <button 
+                  className={styles.countBtn} 
+                  onClick={() => setSearchGuests(searchGuests + 1)}
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
         </div>
