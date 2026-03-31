@@ -264,20 +264,38 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
     setMinorAges(prev => diff > 0 ? [...prev, ''] : prev.slice(0, n));
   };
 
+  const updateMinorAge = (idx: number, age: string) => {
+    setMinorAges(prev => {
+      const copy = [...prev];
+      copy[idx] = age;
+      return copy;
+    });
+  };
+
   const handleBooking = async () => {
     if (!firstName.trim() || !lastName.trim() || !email.trim()) { alert('Preencha seus dados.'); return; }
     setIsSubmitting(true);
     const fmt = (d: string) => d.split('-').reverse().join('/');
     const datesText = `%0A📅 *Período:* ${fmt(checkin)} a ${fmt(checkout)} (${res?.nights} noites)`;
     const guestsText = `%0A👥 *Hóspedes:* ${adults} adultos${minors > 0 ? `, ${minors} crianças` : ''}`;
+    
+    // Add child ages to message
+    let agesText = "";
+    if (minors > 0 && minorAges.length > 0) {
+      const filteredAges = minorAges.filter(a => a.trim() !== "");
+      if (filteredAges.length > 0) {
+        agesText = `%0A👶 *Idades das crianças:* ${filteredAges.join(', ')} anos`;
+      }
+    }
+
     const valueText = `%0A💰 *Valor Total:* R$ ${res?.total.toLocaleString('pt-BR')}`;
-    const wa = `https://wa.me/5511945747572?text=Olá! Me chamo *${firstName} ${lastName}* (${email}).%0A%0AGostaria de reservar *${encodeURIComponent(prop.title)}*.${datesText}${guestsText}${valueText}`;
+    const wa = `https://wa.me/5511945747572?text=Olá! Me chamo *${firstName} ${lastName}* (${email}).%0A%0AGostaria de reservar *${encodeURIComponent(prop.title)}*.${datesText}${guestsText}${agesText}${valueText}`;
     
     try {
       await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email, propertyTitle: prop.title, checkin, checkout, adults, minors, total: res?.total })
+        body: JSON.stringify({ firstName, lastName, email, propertyTitle: prop.title, checkin, checkout, adults, minors, minorAges, total: res?.total })
       });
       window.location.href = wa;
     } catch { window.location.href = wa; }
@@ -303,14 +321,26 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
           <div style={{ border: '1px solid #ccc', borderRadius: 10, padding: '0 16px', marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 0', borderBottom: '1px solid #f1f5f9' }}>
               <div><div style={{ fontWeight: 600 }}>Adultos</div><div style={{ fontSize: '0.78rem' }}>13+ anos</div></div>
-              <div style={{ display: 'flex', gap: 12 }}><button onClick={() => setAdults(Math.max(1, adults-1))}>-</button><span>{adults}</span><button onClick={() => setAdults(adults+1)}>+</button></div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><button onClick={() => setAdults(Math.max(1, adults-1))} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>-</button><span style={{ width: 20, textAlign: 'center', fontWeight: 600 }}>{adults}</span><button onClick={() => setAdults(adults+1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>+</button></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 0' }}>
               <div><div style={{ fontWeight: 600 }}>Crianças</div><div style={{ fontSize: '0.78rem' }}>Até 12 anos</div></div>
-              <div style={{ display: 'flex', gap: 12 }}><button onClick={() => handleMinors(-1)}>-</button><span>{minors}</span><button onClick={() => handleMinors(1)}>+</button></div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}><button onClick={() => handleMinors(-1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>-</button><span style={{ width: 20, textAlign: 'center', fontWeight: 600 }}>{minors}</span><button onClick={() => handleMinors(1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>+</button></div>
             </div>
+            
+            {/* Child Ages Section */}
+            {minors > 0 && (
+              <div style={{ padding: '0 0 16px 0', borderTop: '1px solid #f1f5f9', marginTop: 8 }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase' }}>Idade das crianças:</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {Array.from({ length: minors }).map((_, i) => (
+                    <input key={i} type="number" placeholder={`${i+1}ª`} value={minorAges[i] || ''} onChange={e => updateMinorAge(i, e.target.value)} style={{ width: 50, padding: '8px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', textAlign: 'center', fontSize: '0.85rem' }} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <button onClick={() => { if(!checkin || !checkout) return alert('Escolha datas.'); setStep(2); }} style={{ width: '100%', background: 'linear-gradient(135deg,#FF385C,#E31C5F)', color: 'white', padding: '16px', borderRadius: 12, border: 'none', fontWeight: 700 }}>Reservar via WhatsApp</button>
+          <button onClick={() => { if(!checkin || !checkout) return alert('Escolha datas.'); setStep(2); }} style={{ width: '100%', background: 'linear-gradient(135deg,#FF385C,#E31C5F)', color: 'white', padding: '16px', borderRadius: 12, border: 'none', fontWeight: 700, cursor: 'pointer' }}>Reservar via WhatsApp</button>
         </>
       ) : (
         <>
@@ -319,8 +349,8 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
             <input type="text" placeholder="Sobrenome" value={lastName} onChange={e=>setLastName(e.target.value)} style={{ width: '100%', marginBottom: 10, padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
             <input type="email" placeholder="E-mail" value={email} onChange={e=>setEmail(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
           </div>
-          <button onClick={handleBooking} disabled={isSubmitting} style={{ width: '100%', background: 'linear-gradient(135deg,#25D366,#128C7E)', color: 'white', padding: '16px', borderRadius: 12, border: 'none', fontWeight: 700 }}>{isSubmitting ? 'Confirmando...' : 'Confirmar pelo WhatsApp'}</button>
-          <button onClick={() => setStep(1)} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: '#666', fontSize: '0.8rem' }}>Voltar</button>
+          <button onClick={handleBooking} disabled={isSubmitting} style={{ width: '100%', background: 'linear-gradient(135deg,#25D366,#128C7E)', color: 'white', padding: '16px', borderRadius: 12, border: 'none', fontWeight: 700, cursor: 'pointer' }}>{isSubmitting ? 'Confirmando...' : 'Confirmar pelo WhatsApp'}</button>
+          <button onClick={() => setStep(1)} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: '#666', fontSize: '0.8rem', cursor: 'pointer' }}>Voltar</button>
         </>
       )}
 
