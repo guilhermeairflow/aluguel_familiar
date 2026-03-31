@@ -3,287 +3,194 @@
 import { useState, useEffect } from 'react';
 import { PROPERTIES } from '@/lib/properties-data';
 
-type PriceData = {
-  basePrice: number;       // diária temporada normal
-  highSeasonPrice: number; // diária alta temporada (valor direto)
-  holidayPrice: number;    // diária feriados especiais (valor direto)
-  cleaningFee: number;
-  minNights: number;
-  minNightsHigh: number;
-};
+// --- TIPOS ---
+type PricingRule = { id: string; startDate: string; endDate: string; price: number; };
+type PropertyPricing = { basePrice: number; cleaningFee: number; rules: PricingRule[]; };
 
-const DEFAULT_PRICES: Record<string, PriceData> = Object.fromEntries(
+const DEFAULT_PRICING: Record<string, PropertyPricing> = Object.fromEntries(
   PROPERTIES.map(p => [p.id, {
     basePrice: p.basePricePerNight,
-    highSeasonPrice: Math.round(p.basePricePerNight * 1.5),
-    holidayPrice: Math.round(p.basePricePerNight * 2.2),
     cleaningFee: p.cleaningFee,
-    minNights: 2,
-    minNightsHigh: 3,
+    rules: [],
   }])
 );
-
-function loadPrices(): Record<string, PriceData> {
-  if (typeof window === 'undefined') return DEFAULT_PRICES;
-  try {
-    const saved = localStorage.getItem('af_prices');
-    if (saved) return { ...DEFAULT_PRICES, ...JSON.parse(saved) };
-  } catch {}
-  return DEFAULT_PRICES;
-}
-
-function savePrices(prices: Record<string, PriceData>) {
-  try { localStorage.setItem('af_prices', JSON.stringify(prices)); } catch {}
-}
-
-const SEASONS = [
-  { id: 'base',      label: 'Temporada Normal',                   mult: 1,    icon: '🔵', color: '#2563eb' },
-  { id: 'high',      label: 'Alta (Verão / Julho)',               mult: 1.5,  icon: '🟡', color: '#d97706' },
-  { id: 'holiday',   label: 'Feriados (Natal / Réveillon)',       mult: 2.2,  icon: '🔴', color: '#dc2626' },
-];
 
 const PROP_COLORS: Record<string, string> = {
   '1': '#2563eb', '2': '#16a34a', '3': '#ea580c',
   '4': '#9333ea', '5': '#0891b2', '6': '#db2777', '7': '#d97706',
 };
 
+// --- HELPERS ---
+function loadAllPricing(): Record<string, PropertyPricing> {
+  if (typeof window === 'undefined') return DEFAULT_PRICING;
+  try {
+    const saved = localStorage.getItem('af_dynamic_pricing');
+    if (saved) return { ...DEFAULT_PRICING, ...JSON.parse(saved) };
+  } catch {}
+  return DEFAULT_PRICING;
+}
+
+function saveAllPricing(data: Record<string, PropertyPricing>) {
+  try { localStorage.setItem('af_dynamic_pricing', JSON.stringify(data)); } catch {}
+}
+
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+function isSameDay(d1: Date, d2: Date) {
+  return d1.getUTCFullYear() === d2.getUTCFullYear() && d1.getUTCMonth() === d2.getUTCMonth() && d1.getUTCDate() === d2.getUTCDate();
+}
+
+function dateToISO(d: Date) {
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function PricingPage() {
-  const [prices, setPrices] = useState<Record<string, PriceData>>(DEFAULT_PRICES);
+  const [allPricing, setAllPricing] = useState<Record<string, PropertyPricing>>(DEFAULT_PRICING);
   const [selectedId, setSelectedId] = useState(PROPERTIES[0].id);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectionStart, setSelectionStart] = useState<Date | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<Date | null>(null);
+  const [inputPrice, setInputPrice] = useState<string>('');
   const [savedMsg, setSavedMsg] = useState(false);
 
-  useEffect(() => { setPrices(loadPrices()); }, []);
+  useEffect(() => { setAllPricing(loadAllPricing()); }, []);
 
+  const pricing = allPricing[selectedId] || DEFAULT_PRICING[selectedId];
   const prop = PROPERTIES.find(p => p.id === selectedId)!;
-  const data = prices[selectedId];
 
-  const update = (field: keyof PriceData, val: number) => {
-    setPrices(prev => ({ ...prev, [selectedId]: { ...prev[selectedId], [field]: val } }));
+  const year = currentDate.getUTCFullYear();
+  const month = currentDate.getUTCMonth();
+  const firstDay = new Date(Date.UTC(year, month, 1)).getUTCDay();
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const days = Array.from({ length: daysInMonth }, (_, i) => new Date(Date.UTC(year, month, i + 1)));
+
+  const handleDayClick = (day: Date) => {
+    if (!selectionStart || (selectionStart && selectionEnd)) {
+      setSelectionStart(day);
+      setSelectionEnd(null);
+    } else {
+      if (isSameDay(day, selectionStart)) {
+        setSelectionEnd(day); 
+      } else if (day < selectionStart) {
+        setSelectionStart(day);
+        setSelectionEnd(null);
+      } else {
+        setSelectionEnd(day);
+      }
+    }
   };
 
-  const handleSave = () => {
-    savePrices(prices);
-    setSavedMsg(true);
+  const isInSelection = (day: Date) => {
+    if (!selectionStart) return false;
+    if (selectionStart && !selectionEnd) return isSameDay(day, selectionStart);
+    return day >= selectionStart && day <= selectionEnd!;
+  };
+
+  const getPriceForDate = (day: Date) => {
+    const iso = dateToISO(day);
+    const rule = pricing.rules.find(r => iso >= r.startDate && iso <= r.endDate);
+    return rule ? rule.price : null;
+  };
+
+  const handleApplyPrice = () => {
+    if (!selectionStart || !inputPrice) return;
+    const start = dateToISO(selectionStart);
+    const end = dateToISO(selectionEnd || selectionStart);
+    const price = parseFloat(inputPrice);
+
+    const newRule: PricingRule = { id: Math.random().toString(36).substr(2, 9), startDate: start, endDate: end, price };
+    const filteredRules = pricing.rules.filter(r => !(r.startDate >= start && r.endDate <= end));
+    const updatedPricing = { ...pricing, rules: [...filteredRules, newRule] };
+    const newAllData = { ...allPricing, [selectedId]: updatedPricing };
+    setAllPricing(newAllData);
+    saveAllPricing(newAllData);
+    
+    setSelectionStart(null); setSelectionEnd(null); setInputPrice(''); setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 2000);
   };
 
-  const projected = (mult: number) => Math.round(data.basePrice * mult);
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', borderRadius: 8,
-    border: '1.5px solid #e2e8f0', fontSize: '0.95rem', color: '#0f172a',
-    outline: 'none', fontWeight: 700, background: 'white', boxSizing: 'border-box',
+  const handleClearRules = () => {
+    if (!confirm('Deseja limpar todos os preços personalizados deste imóvel?')) return;
+    const updated = { ...pricing, rules: [] };
+    const newAllData = { ...allPricing, [selectedId]: updated };
+    setAllPricing(newAllData); saveAllPricing(newAllData);
   };
 
-  const rowInput = (label: string, field: keyof PriceData, prefix = 'R$', step = 50, min = 0) => (
-    <div>
-      <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</label>
-      <div style={{ display: 'flex', border: '1.5px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-        {prefix && <span style={{ padding: '10px 12px', background: '#f8fafc', color: '#94a3b8', fontWeight: 700, borderRight: '1px solid #e2e8f0', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>{prefix}</span>}
-        <input
-          type="number"
-          value={data[field]}
-          min={min}
-          step={step}
-          onChange={e => update(field, parseFloat(e.target.value) || 0)}
-          style={{ ...inputStyle, border: 'none', borderRadius: 0, flex: 1 }}
-        />
-      </div>
-    </div>
-  );
-
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
-
-      {/* ── SIDEBAR: lista de imóveis ── */}
-      <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 8px', marginBottom: 4 }}>
-          Selecionar Imóvel
-        </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 300px', gap: 20 }}>
+      {/* Sidebar */}
+      <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {PROPERTIES.map(p => {
-          const color = PROP_COLORS[p.id] || '#64748b';
-          const isSelected = selectedId === p.id;
+          const active = selectedId === p.id; const color = PROP_COLORS[p.id];
           return (
-            <button
-              key={p.id}
-              onClick={() => setSelectedId(p.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 10,
-                border: `2px solid ${isSelected ? color : 'transparent'}`,
-                background: isSelected ? `${color}12` : '#f8fafc',
-                cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-              }}
-            >
-              <img src={p.coverImage} alt="" style={{ width: 36, height: 28, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
+            <button key={p.id} onClick={() => { setSelectedId(p.id); setSelectionStart(null); setSelectionEnd(null); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px', borderRadius: 12, border: `2px solid ${active ? color : 'transparent'}`, background: active ? `${color}10` : '#f8fafc', cursor: 'pointer', textAlign: 'left' }}>
+              <img src={p.coverImage} draggable={false} style={{ width: 44, height: 34, objectFit: 'cover', borderRadius: 6 }} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: isSelected ? 800 : 600, fontSize: '0.78rem', color: isSelected ? color : '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.city}
-                </div>
-                <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>R$ {p.basePricePerNight.toLocaleString('pt-BR')}/noite</div>
+                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: active ? color : '#334155' }}>{p.city}</div>
+                <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>R$ {p.basePricePerNight}/noite</div>
               </div>
             </button>
           );
         })}
       </div>
 
-      {/* ── PAINEL DE PREÇOS ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a' }}>
-              💰 {prop.city} — Gestão de Preços
-            </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-              {prop.title.split('|')[0].trim()} · {prop.maxGuests} hóspedes · {prop.bedrooms} quartos
-            </p>
-          </div>
-          <button
-            onClick={handleSave}
-            style={{ padding: '10px 22px', borderRadius: 9, border: 'none', background: savedMsg ? '#10b981' : '#0f172a', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', transition: 'background 0.3s' }}
-          >
-            {savedMsg ? '✅ Salvo!' : '💾 Salvar Preços'}
-          </button>
-        </div>
-
-        {/* Preços base + taxas */}
-        <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: '22px 24px' }}>
-          <h3 style={{ margin: '0 0 18px', fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: 12 }}>
-            📋 Valores Base
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
-            {rowInput('Diária Base', 'basePrice', 'R$', 100, 100)}
-            {rowInput('Taxa de Limpeza', 'cleaningFee', 'R$', 50, 0)}
-            {rowInput('Mín. Diárias (Normal)', 'minNights', '', 1, 1)}
-            {rowInput('Mín. Diárias (Alta)', 'minNightsHigh', '', 1, 1)}
+      {/* Calendário */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: '1.2rem' }}>{MONTHS[month]} {year}</div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => setCurrentDate(new Date(Date.UTC(year, month - 1, 1)))} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>‹</button>
+            <button onClick={() => setCurrentDate(new Date())} style={{ padding: '0 16px', borderRadius: 10, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>Hoje</button>
+            <button onClick={() => setCurrentDate(new Date(Date.UTC(year, month + 1, 1)))} style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>›</button>
           </div>
         </div>
 
-        {/* Preços por temporada — valores diretos */}
-        <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: '22px 24px' }}>
-          <h3 style={{ margin: '0 0 6px', fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>
-            🎯 Preços por Temporada
-          </h3>
-          <p style={{ margin: '0 0 18px', fontSize: '0.78rem', color: '#94a3b8', borderBottom: '1px solid #f1f5f9', paddingBottom: 12 }}>
-            Defina o valor exato da diária para cada período
-          </p>
-          <div style={{ display: 'grid', gap: 14 }}>
-            {[
-              { label: '🟡 Alta Temporada', field: 'highSeasonPrice' as keyof PriceData, color: '#d97706', bg: '#fffbeb', border: '#fde68a', desc: 'Janeiro, Fevereiro, Julho' },
-              { label: '🔴 Feriados Especiais', field: 'holidayPrice' as keyof PriceData, color: '#dc2626', bg: '#fef2f2', border: '#fecaca', desc: 'Natal, Réveillon, Carnaval, Páscoa' },
-            ].map(s => (
-              <div key={s.field} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'center', background: s.bg, borderRadius: 12, padding: '16px 18px', border: `1px solid ${s.border}` }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem', color: s.color }}>{s.label}</div>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: 4 }}>{s.desc}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 6 }}>
-                    Normal: R$ {data.basePrice.toLocaleString('pt-BR')} &nbsp;·&nbsp;
-                    <span style={{ fontWeight: 700, color: s.color }}>
-                      +{Math.round(((data[s.field] as number) / data.basePrice - 1) * 100)}% acima
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>Diária (R$)</label>
-                  <div style={{ display: 'flex', border: `2px solid ${s.border}`, borderRadius: 8, overflow: 'hidden', background: 'white' }}>
-                    <span style={{ padding: '10px 12px', background: '#f8fafc', color: '#94a3b8', fontWeight: 700, borderRight: '1px solid #e2e8f0', fontSize: '0.85rem' }}>R$</span>
-                    <input
-                      type="number"
-                      value={data[s.field] as number}
-                      min={data.basePrice}
-                      step={50}
-                      onChange={e => update(s.field, parseInt(e.target.value) || data.basePrice)}
-                      style={{ ...inputStyle, border: 'none', borderRadius: 0, flex: 1, fontWeight: 800, fontSize: '1.05rem', color: s.color }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+        <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            {WEEKDAYS.map(w => <div key={w} style={{ padding: '12px', textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{w}</div>)}
           </div>
-        </div>
-
-        {/* Simulador de receita */}
-        <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: '22px 24px' }}>
-          <h3 style={{ margin: '0 0 18px', fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: 12 }}>
-            📊 Simulador de Receita
-          </h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 420 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                  {['Temporada', '2 noites', '3 noites', '5 noites', '7 noites', 'Mês cheio (30n)'].map(h => (
-                    <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Temporada' ? 'left' : 'right', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { label: '🔵 Normal',           price: data.basePrice,         color: '#2563eb' },
-                  { label: '🟡 Alta Temporada',   price: data.highSeasonPrice,   color: '#d97706' },
-                  { label: '🔴 Feriados',          price: data.holidayPrice,      color: '#dc2626' },
-                ].map((row, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px', fontWeight: 700, fontSize: '0.85rem', color: row.color }}>{row.label}</td>
-                    {[2, 3, 5, 7, 30].map(nights => {
-                      const total = (row as any).price * nights + data.cleaningFee;
-                      return (
-                        <td key={nights} style={{ padding: '12px', textAlign: 'right', fontWeight: nights === 30 ? 900 : 600, color: nights === 30 ? row.color : '#0f172a', fontSize: nights === 30 ? '0.95rem' : '0.88rem', whiteSpace: 'nowrap' }}>
-                          R$ {total.toLocaleString('pt-BR')}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: 12 }}>* Valores incluem taxa de limpeza (R$ {data.cleaningFee.toLocaleString('pt-BR')})</p>
-        </div>
-
-        {/* Comparativo com outros imóveis */}
-        <div style={{ background: 'white', borderRadius: 14, border: '1px solid #e2e8f0', padding: '22px 24px' }}>
-          <h3 style={{ margin: '0 0 18px', fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #f1f5f9', paddingBottom: 12 }}>
-            🏠 Comparativo do Portfólio
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {PROPERTIES.map(p => {
-              const pData = prices[p.id];
-              const isSelected = p.id === selectedId;
-              const color = PROP_COLORS[p.id] || '#64748b';
-              const maxBase = Math.max(...PROPERTIES.map(pp => prices[pp.id]?.basePrice || pp.basePricePerNight));
-              const pct = Math.round((pData.basePrice / maxBase) * 100);
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', minHeight: 480 }}>
+            {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} style={{ background: '#fafafa', borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9' }} />)}
+            {days.map(day => {
+              const customPrice = getPriceForDate(day);
+              const selected = isInSelection(day);
+              const isStart = selectionStart && isSameDay(day, selectionStart);
+              const isEnd = selectionEnd && isSameDay(day, selectionEnd);
               return (
-                <div
-                  key={p.id}
-                  onClick={() => setSelectedId(p.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: isSelected ? `${color}08` : '#f8fafc', border: `1.5px solid ${isSelected ? color : 'transparent'}`, cursor: 'pointer', transition: 'all 0.15s' }}
-                >
-                  <img src={p.coverImage} alt="" style={{ width: 44, height: 34, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: isSelected ? color : '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.city}</div>
-                    <div style={{ background: '#e2e8f0', borderRadius: 999, height: 5, marginTop: 4 }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 999 }} />
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontWeight: 800, color: isSelected ? color : '#0f172a', fontSize: '0.9rem' }}>R$ {pData.basePrice.toLocaleString('pt-BR')}</div>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>/noite base</div>
-                  </div>
+                <div key={day.getTime()} onClick={() => handleDayClick(day)} style={{ padding: '12px', borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: selected ? '#eff6ff' : 'white', position: 'relative' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem', fontWeight: isSameDay(day, new Date()) ? 800 : 500, background: isStart || isEnd ? '#2563eb' : 'transparent', color: isStart || isEnd ? 'white' : '#0f172a' }}>{day.getDate()}</div>
+                  {customPrice && <div style={{ marginTop: 8, fontSize: '0.7rem', fontWeight: 800, color: '#dc2626', background: '#fef2f2', padding: '4px 6px', borderRadius: 6, textAlign: 'center' }}>R$ {customPrice.toLocaleString('pt-BR')}</div>}
                 </div>
               );
             })}
           </div>
         </div>
+      </div>
 
-        {/* Botão salvar bottom */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingBottom: 20 }}>
-          <button
-            onClick={handleSave}
-            style={{ padding: '12px 32px', borderRadius: 10, border: 'none', background: savedMsg ? '#10b981' : '#0f172a', color: 'white', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', transition: 'background 0.3s' }}
-          >
-            {savedMsg ? '✅ Preços Salvos!' : '💾 Salvar Todas as Alterações'}
-          </button>
+      {/* Editor */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '24px' }}>
+          <h3 style={{ margin: '0 0 16px', fontWeight: 800, fontSize: '1rem' }}>Ajustar Preço</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: '#f8fafc', padding: '12px', borderRadius: 12, border: '1.5px solid #e2e8f0', fontSize: '0.82rem', fontWeight: 700 }}>
+              {!selectionStart ? 'Selecione datas' : (!selectionEnd ? `Um dia: ${selectionStart.toLocaleDateString('pt-BR')}` : `${selectionStart.toLocaleDateString('pt-BR')} até ${selectionEnd.toLocaleDateString('pt-BR')}`)}
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 8, textTransform: 'uppercase' }}>Novo Valor (R$)</label>
+              <div style={{ display: 'flex', border: '2px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                <span style={{ padding: '12px', background: '#f8fafc', fontWeight: 800 }}>R$</span>
+                <input type="number" value={inputPrice} onChange={e => setInputPrice(e.target.value)} style={{ flex: 1, border: 'none', padding: '12px', fontSize: '1rem', fontWeight: 800, outline: 'none' }} />
+              </div>
+            </div>
+            <button disabled={!selectionStart || !inputPrice} onClick={handleApplyPrice} style={{ padding: '14px', borderRadius: 12, border: 'none', background: !selectionStart || !inputPrice ? '#e2e8f0' : '#2563eb', color: 'white', fontWeight: 700, cursor: 'pointer' }}>{savedMsg ? '✅ Aplicado!' : 'Salvar Diária'}</button>
+          </div>
+        </div>
+        <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '24px' }}>
+          <button onClick={handleClearRules} style={{ width: '100%', background: '#fef2f2', color: '#dc2626', border: 'none', padding: '10px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>Resetar Calendário</button>
         </div>
       </div>
     </div>
