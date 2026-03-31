@@ -3,7 +3,7 @@
 import { PROPERTIES } from '@/lib/properties-data';
 import { loadReviews, getReviewsBySlug, getAverageRating, type Review } from '@/lib/reviews-data';
 import { calculateStayTotal, type PropertyPricing } from '@/lib/pricing-engine';
-import { notFound } from 'next/navigation';
+import { notFound, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import { MapPin, ChevronLeft, Shield, CheckCircle, X, ChevronRight, Star } from 'lucide-react';
 
@@ -242,15 +242,21 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
 }
 
 function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any }) {
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [adults, setAdults] = useState(2);
+  
+  // Initial state logic with searchParams
+  const [adults, setAdults] = useState(() => {
+    const s = searchParams.get('guests');
+    return s ? Math.max(1, parseInt(s)) : 2;
+  });
   const [minors, setMinors] = useState(0);
   const [minorAges, setMinorAges] = useState<string[]>([]);
-  const [checkin, setCheckin] = useState('');
-  const [checkout, setCheckout] = useState('');
+  const [checkin, setCheckin] = useState(searchParams.get('checkin') || '');
+  const [checkout, setCheckout] = useState(searchParams.get('checkout') || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Use the engine for calculation

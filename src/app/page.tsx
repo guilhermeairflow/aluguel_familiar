@@ -25,13 +25,15 @@ function HeroCarousel() {
   ));
 }
 
-function PropertyCard({ prop, dates, allPricing }: { prop: typeof PROPERTIES[0], dates: { start: string, end: string } | null, allPricing: Record<string, PropertyPricing> | null }) {
+function PropertyCard({ prop, dates, guests, allPricing }: { prop: typeof PROPERTIES[0], dates: { start: string, end: string } | null, guests: number, allPricing: Record<string, PropertyPricing> | null }) {
   const pricing = allPricing ? allPricing[prop.id] : null;
   const currentBase = pricing?.basePrice ?? prop.basePricePerNight;
   const res = dates ? calculateStayTotal(prop.id, dates.start, dates.end, allPricing || undefined) : null;
 
+  const query = dates ? `?checkin=${dates.start}&checkout=${dates.end}&guests=${guests}` : '';
+
   return (
-    <a href={`/imoveis/${prop.slug}`} className={styles.card} style={{ display: 'block', textDecoration: 'none' }}>
+    <a href={`/imoveis/${prop.slug}${query}`} className={styles.card} style={{ display: 'block', textDecoration: 'none' }}>
       <div className={styles.cardImgWrap} style={{ position: 'relative' }}>
         <img src={prop.images[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         {pricing && pricing.rules?.some((r:any) => { const t = new Date().toISOString().split('T')[0]; return t >= r.startDate && t <= r.endDate; }) && (
@@ -113,7 +115,7 @@ export default function Home() {
       </section>
       <section className="container" id="results" style={{ padding: '60px 0' }}>
         <h2 style={{ marginBottom: 30 }}>{start && end ? filtered.length + ' encontrados' : 'Explorar'}</h2>
-        <div className={styles.grid}>{filtered.map(p => <PropertyCard key={p.id} prop={p} dates={start && end ? { start, end } : null} allPricing={allPricing} />)}</div>
+        <div className={styles.grid}>{filtered.map(p => <PropertyCard key={p.id} prop={p} dates={start && end ? { start, end } : null} guests={guests} allPricing={allPricing} />)}</div>
       </section>
     </main>
   );
