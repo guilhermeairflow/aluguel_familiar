@@ -118,5 +118,5 @@
   .hero { padding: 100px 0 50px; height: auto; }
   .title { font-size: 2rem; padding: 0 16px; }
   .searchGrid { grid-template-columns: 1fr; width: calc(100% - 40px); }
-  .grid { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; padding: 0 20px; }
 }

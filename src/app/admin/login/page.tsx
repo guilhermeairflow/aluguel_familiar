@@ -1,30 +1,38 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      if (
-        email.trim() === 'admin@aluguelfamiliar.com' &&
-        password === 'AluguelFamiliar@2026'
-      ) {
-        localStorage.setItem('af_admin_logged', '1');
-        window.location.replace('/admin/');
-      } else {
+    try {
+      const res = await signIn('credentials', {
+        email: email.trim(),
+        password,
+        redirect: false
+      });
+
+      if (res?.error) {
         setError('E-mail ou senha incorretos.');
         setLoading(false);
+      } else {
+        router.replace('/admin');
       }
-    }, 400);
+    } catch (err) {
+      setError('Ocorreu um erro ao tentar entrar. Tente novamente.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -94,7 +102,7 @@ export default function AdminLogin() {
         </form>
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: '0.78rem', color: '#94a3b8' }}>
-          Acesso restrito a administradores
+          Autenticação via banco de dados
         </div>
       </div>
     </div>

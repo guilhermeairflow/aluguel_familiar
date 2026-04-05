@@ -1,8 +1,10 @@
-'use client';
+﻿'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import styles from './layout.module.css';
+import { AuthProvider } from './providers';
 
 const NAV_ITEMS = [
   { icon: '📊', label: 'Dashboard', href: '/admin' },
@@ -18,9 +20,8 @@ const NAV_ITEMS = [
 function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
 
-  const handleLogout = () => {
-    localStorage.removeItem('af_admin_logged');
-    window.location.href = '/admin/login';
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/admin/login' });
   };
 
   const groups = [
@@ -78,39 +79,25 @@ function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void })
   );
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function AdminContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [status, setStatus] = useState<'checking' | 'ok' | 'login'>('checking');
 
-  // FIX: usa startsWith para capturar /admin/login e /admin/login/
   const isLoginPage = pathname.startsWith('/admin/login');
 
   useEffect(() => {
-    if (isLoginPage) {
-      setStatus('login');
-      return;
+    if (status === 'unauthenticated' && !isLoginPage) {
+      router.replace('/admin/login');
     }
-    try {
-      const logged = localStorage.getItem('af_admin_logged');
-      if (logged === '1' || logged === 'true') {
-        setStatus('ok');
-      } else {
-        // Redireciona para login SEM trailing slash
-        window.location.replace('/admin/login');
-      }
-    } catch {
-      window.location.replace('/admin/login');
-    }
-  }, [isLoginPage]);
+  }, [status, isLoginPage, router]);
 
-  // Página de login: renderiza sem o shell do painel
-  if (isLoginPage || status === 'login') {
+  if (isLoginPage) {
     return <>{children}</>;
   }
 
-  // Verificando auth: loading silencioso
-  if (status === 'checking') {
+  if (status === 'loading' || status === 'unauthenticated') {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
         <div style={{ textAlign: 'center' }}>
@@ -151,7 +138,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <div className={styles.topbarSub}>AluguelFamiliar · Gestão</div>
             </div>
           </div>
-          <span className={styles.adminBadge}>👤 Admin</span>
+          <span className={styles.adminBadge}>👤 {session?.user?.name || 'Admin'}</span>
         </div>
 
         <div className={styles.pageContent}>
@@ -159,5 +146,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+      <AdminContent>{children}</AdminContent>
+    </AuthProvider>
   );
 }
