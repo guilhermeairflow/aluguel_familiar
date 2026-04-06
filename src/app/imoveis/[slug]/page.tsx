@@ -1,14 +1,16 @@
 'use client';
 
 import { PROPERTIES } from '@/lib/properties-data';
+import { loadAllProperties, loadAllPricing } from '@/lib/data-persistence';
 import { loadReviews, getReviewsBySlug, getAverageRating, type Review } from '@/lib/reviews-data';
 import { calculateStayTotal, type PropertyPricing } from '@/lib/pricing-engine';
+import { getSeasonality } from '@/lib/date-utils';
 import { notFound, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { MapPin, ChevronLeft, Shield, CheckCircle, X, ChevronRight, Star } from 'lucide-react';
 
 export default function ImovelDetails({ params }: { params: { slug: string } }) {
-  const prop = PROPERTIES.find((p) => p.slug === params.slug);
+  const [prop, setProp] = useState<any>(null);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
@@ -18,15 +20,14 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
   const reviewScrollRef = useRef<HTMLDivElement>(null);
   const [isReviewsHovered, setIsReviewsHovered] = useState(false);
 
-  // Dynamic Pricing State
   const [allPricing, setAllPricing] = useState<Record<string, PropertyPricing>>({});
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('af_dynamic_pricing');
-      if (saved) setAllPricing(JSON.parse(saved));
-    }
-  }, []);
+    useEffect(() => {
+    setAllPricing(loadAllPricing());
+    const all = loadAllProperties();
+    const found = all.find((p) => p.slug === params.slug);
+    if (found) setProp({ ...found });
+  }, [params.slug]);
 
   useEffect(() => {
     if (!prop) return;
@@ -50,7 +51,10 @@ export default function ImovelDetails({ params }: { params: { slug: string } }) 
     return () => clearInterval(interval);
   }, [isReviewsHovered, reviews.length]);
 
-  if (!prop) return notFound();
+  if (!prop) {
+    if (typeof window !== 'undefined' && PROPERTIES.every(p => p.slug !== params.slug)) return notFound();
+    return <div style={{ padding: 100, textAlign: 'center' }}>Carregando...</div>;
+  }
 
   const pricing = allPricing[prop.id];
   const basePrice = pricing?.basePrice ?? prop.basePricePerNight;
@@ -248,7 +252,6 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   
-  // Advanced Init from SearchParams
   const [adults, setAdults] = useState(() => {
     const s = searchParams.get('adults');
     return s ? Math.max(1, parseInt(s)) : 2;
@@ -260,19 +263,17 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
   const [minorAges, setMinorAges] = useState<string[]>(() => {
     const s = searchParams.get('minorAges');
     if (s) return s.split(',');
-    // Fallback if minors > 0 but no ages provided
     const n = parseInt(searchParams.get('minors') || '0');
     return Array(n).fill('');
   });
 
   const [checkin, setCheckin] = useState(searchParams.get('checkin') || '');
   const [checkout, setCheckout] = useState(searchParams.get('checkout') || '');
+  const [checkinTime, setCheckinTime] = useState('14:00');
+  const [checkoutTime, setCheckoutTime] = useState('11:00');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Use the engine for calculation
   const res = (checkin && checkout) ? calculateStayTotal(prop.id, checkin, checkout, allPricing) : null;
-  const pricingOverride = allPricing[prop.id];
-  const currentBasePrice = pricingOverride?.basePrice ?? prop.basePricePerNight;
 
   const handleMinors = (val: number) => {
     const n = Math.max(0, val);
@@ -300,10 +301,14 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
     if (!firstName.trim() || !lastName.trim() || !email.trim()) { alert('Preencha seus dados.'); return; }
     setIsSubmitting(true);
     const fmt = (d: string) => d.split('-').reverse().join('/');
-    const datesText = `%0A📅 *Período:* ${fmt(checkin)} a ${fmt(checkout)} (${res?.nights} noites)`;
+    const { category, holidaysFound } = getSeasonality(checkin, checkout, prop.city);
+    
+    const seasonText = `%0A🏝️ *Temporada:* ${category}`;
+    const holidayText = holidaysFound.length > 0 ? `%0A🎉 *Eventos/Feriados:* ${holidaysFound.join(', ')}` : "";
+    
+    const datesText = `%0A📅 *Período:* ${fmt(checkin)} às ${checkinTime} até ${fmt(checkout)} às ${checkoutTime} (${res?.nights} noites)`;
     const guestsText = `%0A👥 *Hóspedes:* ${adults} adultos${minors > 0 ? `, ${minors} crianças` : ''}`;
     
-    // Add child ages to message
     let agesText = "";
     if (minors > 0 && minorAges.length > 0) {
       const filteredAges = minorAges.filter(a => a.trim() !== "");
@@ -313,16 +318,23 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
     }
 
     const valueText = `%0A💰 *Valor Total:* R$ ${res?.total.toLocaleString('pt-BR')}`;
-    const wa = `https://wa.me/5511945747572?text=Olá! Me chamo *${firstName} ${lastName}* (${email}).%0A%0AGostaria de reservar *${encodeURIComponent(prop.title)}*.${datesText}${guestsText}${agesText}${valueText}`;
+    const wa = `https://wa.me/5511945747572?text=Olá! Me chamo *${firstName} ${lastName}* (${email}).%0A%0AGostaria de reservar *${encodeURIComponent(prop.title)}*.${seasonText}${holidayText}${datesText}${guestsText}${agesText}${valueText}`;
     
     try {
       await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email, propertyTitle: prop.title, checkin, checkout, adults, minors, minorAges, total: res?.total })
+        body: JSON.stringify({ 
+          firstName, lastName, email, 
+          propertyTitle: prop.title, 
+          checkin, checkout, 
+          checkinTime, checkoutTime, 
+          adults, minors, minorAges, 
+          total: res?.total 
+        })
       });
-      window.location.href = wa;
-    } catch { window.location.href = wa; }
+      window.open(wa, '_blank');
+    } catch { window.open(wa, '_blank'); }
     finally { setTimeout(() => setIsSubmitting(false), 5000); }
   };
 
@@ -332,13 +344,21 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
         <>
           <div style={{ border: '1px solid #ccc', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-              <div style={{ padding: '12px 14px', borderRight: '1px solid #ccc' }}>
+              <div style={{ padding: '12px 14px', borderRight: '1px solid #ccc', borderBottom: '1px solid #ccc' }}>
                 <div style={{ fontSize: '0.68rem', fontWeight: 800 }}>Check-in</div>
                 <input type="date" value={checkin} min={new Date().toISOString().split('T')[0]} onChange={e => setCheckin(e.target.value)} style={{ border: 'none', width: '100%', background: 'transparent' }} />
               </div>
-              <div style={{ padding: '12px 14px' }}>
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid #ccc' }}>
                 <div style={{ fontSize: '0.68rem', fontWeight: 800 }}>Check-out</div>
                 <input type="date" value={checkout} min={checkin || new Date().toISOString().split('T')[0]} onChange={e => setCheckout(e.target.value)} style={{ border: 'none', width: '100%', background: 'transparent' }} />
+              </div>
+              <div style={{ padding: '12px 14px', borderRight: '1px solid #ccc' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800 }}>Horário Entrada</div>
+                <input type="time" value={checkinTime} onChange={e => setCheckinTime(e.target.value)} style={{ border: 'none', width: '100%', background: 'transparent', fontSize: '0.85rem', outline: 'none' }} />
+              </div>
+              <div style={{ padding: '12px 14px' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800 }}>Horário Saída</div>
+                <input type="time" value={checkoutTime} onChange={e => setCheckoutTime(e.target.value)} style={{ border: 'none', width: '100%', background: 'transparent', fontSize: '0.85rem', outline: 'none' }} />
               </div>
             </div>
           </div>
@@ -359,8 +379,6 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
                 <button onClick={() => handleMinors(minors+1)} style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>+</button>
               </div>
             </div>
-            
-            {/* Child Ages Section */}
             {minors > 0 && (
               <div style={{ padding: '0 0 16px 0', borderTop: '1px solid #f1f5f9', marginTop: 8 }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', marginBottom: 10, textTransform: 'uppercase' }}>Idade das crianças:</div>
@@ -385,7 +403,6 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
           <button onClick={() => setStep(1)} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: '#666', fontSize: '0.8rem', cursor: 'pointer' }}>Voltar</button>
         </>
       )}
-
       {res && (
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
@@ -405,4 +422,3 @@ function ReservationWidget({ prop, allPricing }: { prop: any, allPricing: any })
     </div>
   );
 }
-

@@ -2,19 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { PROPERTIES } from '@/lib/properties-data';
+import { loadAllProperties, saveProperty as savePersistenceProperty } from '@/lib/data-persistence';
 
 type Property = typeof PROPERTIES[0];
 
-function saveProperty(updated: Property) {
-  try {
-    const saved = localStorage.getItem('af_properties');
-    const all: Property[] = saved ? JSON.parse(saved) : PROPERTIES;
-    const idx = all.findIndex(p => p.id === updated.id);
-    if (idx >= 0) all[idx] = updated;
-    else all.push(updated);
-    localStorage.setItem('af_properties', JSON.stringify(all));
-  } catch {}
-}
+// SYNC Helper: Salva preços dinâmicos para manter consistência com o calendário
+
+
+
 
 export default function PropertyAdminPage({ params }: { params: { id: string } }) {
   const original = PROPERTIES.find(p => p.id === params.id);
@@ -24,16 +19,11 @@ export default function PropertyAdminPage({ params }: { params: { id: string } }
   const [newFeature, setNewFeature] = useState('');
   const [newImage, setNewImage] = useState('');
 
-  useEffect(() => {
-    try {
-      const savedData = localStorage.getItem('af_properties');
-      if (savedData) {
-        const all: Property[] = JSON.parse(savedData);
-        const found = all.find(p => p.id === params.id);
-        if (found) { setProp(found); return; }
-      }
-    } catch {}
-    if (original) setProp({ ...original });
+    useEffect(() => {
+    const all = loadAllProperties();
+    const found = all.find(p => p.id === params.id);
+    if (found) setProp({ ...found });
+    else if (original) setProp({ ...original });
   }, [params.id]);
 
   if (!prop || !original) return (
@@ -47,20 +37,16 @@ export default function PropertyAdminPage({ params }: { params: { id: string } }
   const update = (field: string, value: any) => setProp(prev => prev ? { ...prev, [field]: value } : prev);
 
   const handleSave = () => {
-    saveProperty(prop);
+    savePersistenceProperty(prop);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const handleReset = () => {
     if (confirm('Restaurar todos os dados originais deste imóvel?')) {
-      setProp({ ...original });
-      const saved = localStorage.getItem('af_properties');
-      if (saved) {
-        const all: Property[] = JSON.parse(saved);
-        const idx = all.findIndex(p => p.id === params.id);
-        if (idx >= 0) { all[idx] = original; localStorage.setItem('af_properties', JSON.stringify(all)); }
-      }
+      const resetProp = { ...original };
+      setProp(resetProp);
+      saveProperty(resetProp);
     }
   };
 

@@ -1,46 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PROPERTIES } from '@/lib/properties-data';
+import { PROPERTIES as STATIC_PROPERTIES } from '@/lib/properties-data';
+import { loadAllProperties, loadAllPricing as loadPersistencePricing, savePricing } from '@/lib/data-persistence';
 
 // --- TIPOS ---
 type PricingRule = { id: string; startDate: string; endDate: string; price: number; };
 type PropertyPricing = { basePrice: number; cleaningFee: number; rules: PricingRule[]; };
 
-const DEFAULT_PRICING: Record<string, PropertyPricing> = Object.fromEntries(
-  PROPERTIES.map(p => [p.id, {
-    basePrice: p.basePricePerNight,
-    cleaningFee: p.cleaningFee,
-    rules: [],
-  }])
-);
-
 const PROP_COLORS: Record<string, string> = {
   '1': '#2563eb', '2': '#16a34a', '3': '#ea580c',
   '4': '#9333ea', '5': '#0891b2', '6': '#db2777', '7': '#d97706',
 };
-
-// --- HELPERS ---
-function loadAllPricing(): Record<string, PropertyPricing> {
-  if (typeof window === 'undefined') return DEFAULT_PRICING;
-  try {
-    const saved = localStorage.getItem('af_dynamic_pricing');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Merge com default para garantir que novas props existam
-      const merged = { ...DEFAULT_PRICING };
-      Object.keys(parsed).forEach(id => {
-        merged[id] = { ...merged[id], ...parsed[id] };
-      });
-      return merged;
-    }
-  } catch {}
-  return DEFAULT_PRICING;
-}
-
-function saveAllPricing(data: Record<string, PropertyPricing>) {
-  try { localStorage.setItem('af_dynamic_pricing', JSON.stringify(data)); } catch {}
-}
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const WEEKDAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -57,16 +28,15 @@ function dateToISO(d: Date) {
 }
 
 export default function PricingPage() {
-  const [allPricing, setAllPricing] = useState<Record<string, PropertyPricing>>(DEFAULT_PRICING);
-  const [selectedId, setSelectedId] = useState(PROPERTIES[0].id);
+  const [allPricing, setAllPricing] = useState<Record<string, PropertyPricing>>({});
+  const [properties, setProperties] = useState(STATIC_PROPERTIES);
+  const [selectedId, setSelectedId] = useState(STATIC_PROPERTIES[0].id);
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // Selection
   const [selectionStart, setSelectionStart] = useState<Date | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<Date | null>(null);
   const [inputPrice, setInputPrice] = useState<string>('');
   
-  // States para os inputs de Base (para não salvar no onChange)
   const [tempBasePrice, setTempBasePrice] = useState<string>('');
   const [tempCleaningFee, setTempCleaningFee] = useState<string>('');
   
@@ -74,23 +44,30 @@ export default function PricingPage() {
   const [baseSavedMsg, setBaseSavedMsg] = useState(false);
 
   useEffect(() => {
-    const loaded = loadAllPricing();
+    const loaded = loadPersistencePricing();
+    const props = loadAllProperties();
+    setProperties(props);
     setAllPricing(loaded);
-    // Inicializa os inputs temporários com o imóvel atual
-    const current = loaded[selectedId] || DEFAULT_PRICING[selectedId];
-    setTempBasePrice(current.basePrice.toString());
-    setTempCleaningFee(current.cleaningFee.toString());
+    
+    const current = loaded[selectedId];
+    if (current) {
+      setTempBasePrice(current.basePrice.toString());
+      setTempCleaningFee(current.cleaningFee.toString());
+    }
   }, []);
 
-  // Atualiza os inputs temporários quando trocar de imóvel
   useEffect(() => {
-    const current = allPricing[selectedId] || DEFAULT_PRICING[selectedId];
-    setTempBasePrice(current.basePrice.toString());
-    setTempCleaningFee(current.cleaningFee.toString());
+    const current = allPricing[selectedId];
+    if (current) {
+      setTempBasePrice(current.basePrice.toString());
+      setTempCleaningFee(current.cleaningFee.toString());
+    }
   }, [selectedId, allPricing]);
 
-  const pricing = allPricing[selectedId] || DEFAULT_PRICING[selectedId];
-  const prop = PROPERTIES.find(p => p.id === selectedId)!;
+  const pricing = allPricing[selectedId];
+  const prop = properties.find(p => p.id === selectedId);
+
+  if (!pricing || !prop) return <div style={{ padding: 40 }}>Carregando...</div>;
 
   const year = currentDate.getUTCFullYear();
   const month = currentDate.getUTCMonth();
@@ -126,7 +103,6 @@ export default function PricingPage() {
     return rule ? rule.price : null;
   };
 
-  // Salvar Regra de Data
   const handleApplyPrice = () => {
     if (!selectionStart || !inputPrice) return;
     const startValue = dateToISO(selectionStart);
@@ -138,13 +114,12 @@ export default function PricingPage() {
     const updatedPricing = { ...pricing, rules: [...filteredRules, newRule] };
     const newAllData = { ...allPricing, [selectedId]: updatedPricing };
     setAllPricing(newAllData);
-    saveAllPricing(newAllData);
+    savePricing(selectedId, updatedPricing);
     
     setSelectionStart(null); setSelectionEnd(null); setInputPrice(''); setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 2000);
   };
 
-  // Salvar Valores Base
   const handleSaveBase = () => {
     const bp = parseFloat(tempBasePrice) || 0;
     const cf = parseFloat(tempCleaningFee) || 0;
@@ -152,7 +127,20 @@ export default function PricingPage() {
     const newAllData = { ...allPricing, [selectedId]: updatedPricing };
     
     setAllPricing(newAllData);
-    saveAllPricing(newAllData);
+    savePricing(selectedId, updatedPricing);
+
+    try {
+      const savedProps = localStorage.getItem('af_properties');
+      const allProps = savedProps ? JSON.parse(savedProps) : [...STATIC_PROPERTIES];
+      const idx = allProps.findIndex((p: any) => p.id === selectedId);
+      if (idx >= 0) {
+        allProps[idx].basePricePerNight = bp;
+        allProps[idx].cleaningFee = cf;
+        localStorage.setItem('af_properties', JSON.stringify(allProps));
+      }
+    } catch (err) {
+      console.error("Erro ao sincronizar com af_properties:", err);
+    }
     
     setBaseSavedMsg(true);
     setTimeout(() => setBaseSavedMsg(false), 2000);
@@ -162,16 +150,16 @@ export default function PricingPage() {
     if (!confirm('Deseja limpar todos os preços personalizados deste imóvel?')) return;
     const updated = { ...pricing, rules: [] };
     const newAllData = { ...allPricing, [selectedId]: updated };
-    setAllPricing(newAllData); saveAllPricing(newAllData);
+    setAllPricing(newAllData); savePricing(selectedId, updated);
   };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 300px', gap: 20 }}>
       {/* Sidebar - Lista de Imóveis */}
       <div style={{ background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {PROPERTIES.map(p => {
+        {properties.map(p => {
           const active = selectedId === p.id; const color = PROP_COLORS[p.id];
-          const curr = allPricing[p.id] || DEFAULT_PRICING[p.id];
+          const curr = allPricing[p.id] || { basePrice: p.basePricePerNight };
           return (
             <button key={p.id} onClick={() => { setSelectedId(p.id); setSelectionStart(null); setSelectionEnd(null); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px', borderRadius: 12, border: `2px solid ${active ? color : 'transparent'}`, background: active ? `${color}10` : '#f8fafc', cursor: 'pointer', textAlign: 'left' }}>
               <img src={p.coverImage} draggable={false} style={{ width: 44, height: 34, objectFit: 'cover', borderRadius: 6 }} />
